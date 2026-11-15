@@ -9,7 +9,7 @@ import {
 import App from "./App";
 import { APP_CONFIG, PORTAL_PLACEHOLDERS } from "./config/app";
 
-describe("Astro Earth Portal", () => {
+describe("Astro Sentinella Portal", () => {
   afterEach(() => {
     window.localStorage.clear();
     vi.restoreAllMocks();
@@ -198,7 +198,7 @@ describe("Astro Earth Portal", () => {
       observationDate: PORTAL_PLACEHOLDERS.observationDate,
     }));
     window.localStorage.setItem(
-      "astro-earth.portal-history.v1",
+      "astro-sentinella.portal-history.v1",
       JSON.stringify(entries)
     );
 
@@ -220,7 +220,7 @@ describe("Astro Earth Portal", () => {
 
   it("ignores invalid entries in history and provides RA autocomplete suggestions", async () => {
     window.localStorage.setItem(
-      "astro-earth.portal-history.v1",
+      "astro-sentinella.portal-history.v1",
       JSON.stringify([
         {
           ra: "invalid-ra",

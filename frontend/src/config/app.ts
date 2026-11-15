@@ -1,5 +1,5 @@
 export const APP_CONFIG = {
-  name: "Astro Earth",
+  name: "Astro Sentinella",
   githubUrl: "https://github.com/daviddrdz/astro-sentinella",
   metadataEndpoint: "/api/metadata",
 } as const;
@@ -25,7 +25,7 @@ export const PORTAL_PLACEHOLDERS = {
 } as const;
 
 export const PORTAL_HISTORY_CONFIG = {
-  storageKey: "astro-earth.portal-history.v1",
+  storageKey: "astro-sentinella.portal-history.v1",
   maxItems: 50,
   maxSuggestions: 10,
   emptyLength: 0,
