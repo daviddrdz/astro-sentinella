@@ -48,6 +48,9 @@ export function QueryPortalCard({
   const [history, setHistory] = useState<QueryParams[]>(() =>
     loadQueryHistory()
   );
+  const [autocompleteField, setAutocompleteField] = useState<
+    "ra" | "dec" | null
+  >(null);
   const [fetchedMetadata, setFetchedMetadata] = useState<{
     key: string;
     data: CoordinateMetadata;
@@ -165,7 +168,26 @@ export function QueryPortalCard({
     setValues(entry);
     setHasSubmitted(false);
     setTouched({});
+    setAutocompleteField(null);
   };
+
+  const raSuggestions = useMemo(() => {
+    const term = values.ra.trim().toLowerCase();
+    return history.filter((item) =>
+      term.length === PORTAL_HISTORY_CONFIG.emptyLength
+        ? true
+        : item.ra.toLowerCase().includes(term)
+    );
+  }, [history, values.ra]);
+
+  const decSuggestions = useMemo(() => {
+    const term = values.dec.trim().toLowerCase();
+    return history.filter((item) =>
+      term.length === PORTAL_HISTORY_CONFIG.emptyLength
+        ? true
+        : item.dec.toLowerCase().includes(term)
+    );
+  }, [history, values.dec]);
 
   const handleClearHistory = () => {
     clearQueryHistory();
@@ -191,7 +213,7 @@ export function QueryPortalCard({
             className="flex flex-col gap-5"
           >
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <div className="flex flex-col gap-1.5">
+              <div className="relative flex flex-col gap-1.5">
                 <label
                   htmlFor="portal-ra"
                   className="text-[length:var(--ae-text-sm)] font-medium text-[var(--ae-text-secondary)]"
@@ -204,19 +226,62 @@ export function QueryPortalCard({
                   name="ra"
                   type="text"
                   required
+                  autoComplete="off"
                   autoCorrect="off"
                   autoCapitalize="none"
                   spellCheck={false}
                   placeholder={PORTAL_PLACEHOLDERS.ra}
                   value={values.ra}
-                  onChange={(e) => handleFieldChange("ra", e.target.value)}
-                  onBlur={() => handleFieldBlur("ra")}
+                  onFocus={() => setAutocompleteField("ra")}
+                  onChange={(e) => {
+                    handleFieldChange("ra", e.target.value);
+                    setAutocompleteField("ra");
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") {
+                      setAutocompleteField(null);
+                    }
+                  }}
+                  onBlur={() => {
+                    setAutocompleteField(null);
+                    handleFieldBlur("ra");
+                  }}
                   aria-invalid={visibleErrors.ra ? "true" : "false"}
                   aria-describedby={
                     visibleErrors.ra ? "portal-ra-error" : undefined
                   }
                   className="input input-bordered ae-field-input w-full"
                 />
+                {autocompleteField === "ra" &&
+                  raSuggestions.length > PORTAL_HISTORY_CONFIG.emptyLength && (
+                    <ul
+                      role="listbox"
+                      aria-label="RA autocomplete suggestions"
+                      className="absolute top-full right-0 left-0 z-20 mt-1 max-h-48 overflow-y-auto rounded-lg border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-elevated)] p-1 shadow-xl"
+                    >
+                      {raSuggestions.map((entry) => (
+                        <li
+                          key={`${entry.ra}|${entry.dec}|${entry.fieldSizeDeg}`}
+                          role="option"
+                          aria-selected={entry.ra === values.ra}
+                        >
+                          <button
+                            type="button"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              handleSelectHistory(entry);
+                            }}
+                            className="flex w-full flex-col rounded px-2.5 py-1.5 text-left font-mono text-[length:var(--ae-text-sm)] text-[var(--ae-text-primary)] hover:bg-[var(--ae-primary)]/15"
+                          >
+                            <span>{entry.ra}</span>
+                            <span className="text-[var(--ae-text-muted)]">
+                              {`${entry.dec} | ${entry.fieldSizeDeg} deg`}
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 {visibleErrors.ra && (
                   <p
                     id="portal-ra-error"
@@ -231,7 +296,7 @@ export function QueryPortalCard({
                 )}
               </div>
 
-              <div className="flex flex-col gap-1.5">
+              <div className="relative flex flex-col gap-1.5">
                 <label
                   htmlFor="portal-dec"
                   className="text-[length:var(--ae-text-sm)] font-medium text-[var(--ae-text-secondary)]"
@@ -244,19 +309,62 @@ export function QueryPortalCard({
                   name="dec"
                   type="text"
                   required
+                  autoComplete="off"
                   autoCorrect="off"
                   autoCapitalize="none"
                   spellCheck={false}
                   placeholder={PORTAL_PLACEHOLDERS.dec}
                   value={values.dec}
-                  onChange={(e) => handleFieldChange("dec", e.target.value)}
-                  onBlur={() => handleFieldBlur("dec")}
+                  onFocus={() => setAutocompleteField("dec")}
+                  onChange={(e) => {
+                    handleFieldChange("dec", e.target.value);
+                    setAutocompleteField("dec");
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") {
+                      setAutocompleteField(null);
+                    }
+                  }}
+                  onBlur={() => {
+                    setAutocompleteField(null);
+                    handleFieldBlur("dec");
+                  }}
                   aria-invalid={visibleErrors.dec ? "true" : "false"}
                   aria-describedby={
                     visibleErrors.dec ? "portal-dec-error" : undefined
                   }
                   className="input input-bordered ae-field-input w-full"
                 />
+                {autocompleteField === "dec" &&
+                  decSuggestions.length > PORTAL_HISTORY_CONFIG.emptyLength && (
+                    <ul
+                      role="listbox"
+                      aria-label="Dec autocomplete suggestions"
+                      className="absolute top-full right-0 left-0 z-20 mt-1 max-h-48 overflow-y-auto rounded-lg border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-elevated)] p-1 shadow-xl"
+                    >
+                      {decSuggestions.map((entry) => (
+                        <li
+                          key={`${entry.ra}|${entry.dec}|${entry.fieldSizeDeg}`}
+                          role="option"
+                          aria-selected={entry.dec === values.dec}
+                        >
+                          <button
+                            type="button"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              handleSelectHistory(entry);
+                            }}
+                            className="flex w-full flex-col rounded px-2.5 py-1.5 text-left font-mono text-[length:var(--ae-text-sm)] text-[var(--ae-text-primary)] hover:bg-[var(--ae-primary)]/15"
+                          >
+                            <span>{entry.dec}</span>
+                            <span className="text-[var(--ae-text-muted)]">
+                              {`${entry.ra} | ${entry.fieldSizeDeg} deg`}
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 {visibleErrors.dec && (
                   <p
                     id="portal-dec-error"

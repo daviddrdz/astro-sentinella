@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import App from "./App";
 import { APP_CONFIG, PORTAL_PLACEHOLDERS } from "./config/app";
 
@@ -222,5 +228,48 @@ describe("Astro Earth Portal", () => {
     expect(
       screen.queryByRole("region", { name: "Recent coordinate queries" })
     ).not.toBeInTheDocument();
+  });
+
+  it("ignores invalid entries in history and provides RA autocomplete suggestions", async () => {
+    window.localStorage.setItem(
+      "astro-earth.portal-history.v1",
+      JSON.stringify([
+        {
+          ra: "invalid-ra",
+          dec: "invalid-dec",
+          fieldSizeDeg: "999",
+          observationDate: "",
+        },
+        {
+          ra: PORTAL_PLACEHOLDERS.ra,
+          dec: PORTAL_PLACEHOLDERS.dec,
+          fieldSizeDeg: "0.5",
+          observationDate: PORTAL_PLACEHOLDERS.observationDate,
+        },
+      ])
+    );
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(null, { status: 404 })
+    );
+
+    render(<App />);
+
+    const raInput = screen.getByLabelText("RA");
+    fireEvent.focus(raInput);
+    fireEvent.change(raInput, { target: { value: "05h" } });
+
+    const listbox = screen.getByRole("listbox", {
+      name: "RA autocomplete suggestions",
+    });
+    expect(listbox).toBeInTheDocument();
+    expect(listbox).toHaveTextContent(PORTAL_PLACEHOLDERS.ra);
+    expect(listbox).not.toHaveTextContent("invalid-ra");
+
+    fireEvent.mouseDown(within(listbox).getByRole("button"));
+
+    expect(raInput).toHaveValue(PORTAL_PLACEHOLDERS.ra);
+    expect(screen.getByLabelText("Dec")).toHaveValue(PORTAL_PLACEHOLDERS.dec);
+    expect(screen.getByLabelText("Field Size (deg)")).toHaveValue("0.5");
   });
 });

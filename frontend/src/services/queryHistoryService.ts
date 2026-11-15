@@ -1,20 +1,29 @@
 import { PORTAL_HISTORY_CONFIG } from "../config/app";
 import type { QueryParams } from "../types/portal";
+import { validateQueryParams } from "../utils/coordinates";
 
 function isValidQueryEntry(item: unknown): item is QueryParams {
   if (typeof item !== "object" || item === null) {
     return false;
   }
   const candidate = item as Partial<QueryParams>;
-  return (
-    typeof candidate.ra === "string" &&
-    candidate.ra.trim().length > PORTAL_HISTORY_CONFIG.emptyLength &&
-    typeof candidate.dec === "string" &&
-    candidate.dec.trim().length > PORTAL_HISTORY_CONFIG.emptyLength &&
-    typeof candidate.fieldSizeDeg === "string" &&
-    candidate.fieldSizeDeg.trim().length > PORTAL_HISTORY_CONFIG.emptyLength &&
-    typeof candidate.observationDate === "string"
-  );
+  if (
+    typeof candidate.ra !== "string" ||
+    typeof candidate.dec !== "string" ||
+    typeof candidate.fieldSizeDeg !== "string" ||
+    typeof candidate.observationDate !== "string"
+  ) {
+    return false;
+  }
+
+  const errors = validateQueryParams({
+    ra: candidate.ra,
+    dec: candidate.dec,
+    fieldSizeDeg: candidate.fieldSizeDeg,
+    observationDate: candidate.observationDate,
+  });
+
+  return Object.keys(errors).length === PORTAL_HISTORY_CONFIG.emptyLength;
 }
 
 export function loadQueryHistory(): QueryParams[] {
@@ -37,6 +46,10 @@ export function loadQueryHistory(): QueryParams[] {
 
 export function saveQueryHistoryEntry(entry: QueryParams): QueryParams[] {
   const current = loadQueryHistory();
+  if (!isValidQueryEntry(entry)) {
+    return current;
+  }
+
   const deduped = current.filter(
     (item) =>
       !(
