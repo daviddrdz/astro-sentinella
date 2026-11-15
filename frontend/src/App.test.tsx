@@ -32,14 +32,13 @@ describe("Astro Earth Portal", () => {
       "aria-invalid",
       "false"
     );
-    expect(screen.getByLabelText("Observation Date")).toHaveAttribute(
-      "aria-invalid",
-      "false"
-    );
+    const dateSelect = screen.getByLabelText("Observation Date");
+    expect(dateSelect).toHaveAttribute("aria-invalid", "false");
+    expect(dateSelect).toBeDisabled();
     expect(screen.getByRole("button", { name: "Query" })).toBeInTheDocument();
   });
 
-  it("fetches and displays available metadata from coordinates without clicking Query", async () => {
+  it("fetches metadata and populates Observation Date options from coordinates without clicking Query", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -47,6 +46,7 @@ describe("Astro Earth Portal", () => {
         catalogId: "M42",
         instrument: "NIRCam",
         availableBands: ["Ha", "OIII", "IR"],
+        availableDates: [PORTAL_PLACEHOLDERS.observationDate, "2026-10-14"],
         frameCount: 12,
         observationWindow: "2026-10-12",
       }),
@@ -71,9 +71,18 @@ describe("Astro Earth Portal", () => {
     expect(metadataPanel).toHaveTextContent("M42 | Orion Nebula");
     expect(metadataPanel).toHaveTextContent("Ha | OIII | IR");
     expect(metadataPanel).toHaveTextContent("12 frames");
+
+    const dateSelect = screen.getByLabelText("Observation Date");
+    expect(dateSelect).toBeEnabled();
+    expect(
+      screen.getByRole("option", { name: PORTAL_PLACEHOLDERS.observationDate })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "2026-10-14" })
+    ).toBeInTheDocument();
   });
 
-  it("hides metadata panel when no metadata is available for coordinates", async () => {
+  it("hides metadata panel and keeps date dropdown disabled when no metadata is available", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: false,
       status: 404,
@@ -94,6 +103,7 @@ describe("Astro Earth Portal", () => {
     expect(
       screen.queryByLabelText("Available coordinate metadata")
     ).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Observation Date")).toBeDisabled();
   });
 
   it("validates fields on submit and focuses the first invalid input", () => {
@@ -106,10 +116,18 @@ describe("Astro Earth Portal", () => {
     expect(raInput).toHaveFocus();
   });
 
-  it("transitions to Explorer on valid submission and allows returning to Portal", () => {
+  it("transitions to Explorer on valid submission and allows returning to Portal", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue({
-      ok: false,
-      status: 404,
+      ok: true,
+      json: async () => ({
+        targetName: "Orion Nebula",
+        catalogId: "M42",
+        instrument: "NIRCam",
+        availableBands: ["Ha", "OIII"],
+        availableDates: [PORTAL_PLACEHOLDERS.observationDate],
+        frameCount: 12,
+        observationWindow: "2026-10-12",
+      }),
     } as Response);
 
     render(<App />);
@@ -123,7 +141,13 @@ describe("Astro Earth Portal", () => {
     fireEvent.change(screen.getByLabelText("Field Size (deg)"), {
       target: { value: "0.5" },
     });
-    fireEvent.change(screen.getByLabelText("Observation Date"), {
+
+    const dateSelect = screen.getByLabelText("Observation Date");
+    await waitFor(() => {
+      expect(dateSelect).toBeEnabled();
+    });
+
+    fireEvent.change(dateSelect, {
       target: { value: PORTAL_PLACEHOLDERS.observationDate },
     });
 

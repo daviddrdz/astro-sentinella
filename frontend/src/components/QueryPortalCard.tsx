@@ -31,7 +31,7 @@ export function QueryPortalCard({
   const raInputRef = useRef<HTMLInputElement>(null);
   const decInputRef = useRef<HTMLInputElement>(null);
   const fieldSizeInputRef = useRef<HTMLInputElement>(null);
-  const dateInputRef = useRef<HTMLInputElement>(null);
+  const dateSelectRef = useRef<HTMLSelectElement>(null);
 
   const [values, setValues] = useState<QueryParams>(initialValues);
   const [touched, setTouched] = useState<TouchedFields>({});
@@ -40,18 +40,6 @@ export function QueryPortalCard({
     key: string;
     data: CoordinateMetadata;
   } | null>(null);
-
-  const allErrors = useMemo(() => validateQueryParams(values), [values]);
-
-  const visibleErrors: QueryFieldErrors = useMemo(() => {
-    const visible: QueryFieldErrors = {};
-    (Object.keys(allErrors) as (keyof QueryParams)[]).forEach((key) => {
-      if (hasSubmitted || touched[key]) {
-        visible[key] = allErrors[key];
-      }
-    });
-    return visible;
-  }, [allErrors, hasSubmitted, touched]);
 
   const coordinatesReady = hasValidCoordinates(values.ra, values.dec);
   const coordinateKey = coordinatesReady
@@ -80,6 +68,36 @@ export function QueryPortalCard({
       ? fetchedMetadata.data
       : null;
 
+  const availableDates = useMemo(
+    () => coordinateMetadata?.availableDates ?? [],
+    [coordinateMetadata]
+  );
+
+  const selectedObservationDate = availableDates.includes(
+    values.observationDate
+  )
+    ? values.observationDate
+    : "";
+
+  const allErrors = useMemo(
+    () =>
+      validateQueryParams({
+        ...values,
+        observationDate: selectedObservationDate,
+      }),
+    [values, selectedObservationDate]
+  );
+
+  const visibleErrors: QueryFieldErrors = useMemo(() => {
+    const visible: QueryFieldErrors = {};
+    (Object.keys(allErrors) as (keyof QueryParams)[]).forEach((key) => {
+      if (hasSubmitted || touched[key]) {
+        visible[key] = allErrors[key];
+      }
+    });
+    return visible;
+  }, [allErrors, hasSubmitted, touched]);
+
   const handleFieldChange = (field: keyof QueryParams, nextValue: string) => {
     setValues((prev) => ({ ...prev, [field]: nextValue }));
   };
@@ -94,7 +112,7 @@ export function QueryPortalCard({
     if (errors.ra) raInputRef.current?.focus();
     else if (errors.dec) decInputRef.current?.focus();
     else if (errors.fieldSizeDeg) fieldSizeInputRef.current?.focus();
-    else if (errors.observationDate) dateInputRef.current?.focus();
+    else if (errors.observationDate) dateSelectRef.current?.focus();
   };
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -107,16 +125,24 @@ export function QueryPortalCard({
       observationDate: true,
     });
 
-    if (Object.keys(allErrors).length > 0) {
-      focusFirstInvalidField(allErrors);
+    const submissionValues: QueryParams = {
+      ...values,
+      observationDate: selectedObservationDate,
+    };
+    const submissionErrors = validateQueryParams(submissionValues);
+
+    if (Object.keys(submissionErrors).length > 0) {
+      focusFirstInvalidField(submissionErrors);
       return;
     }
 
     onSubmitQuery({
-      ra: values.ra.trim(),
-      dec: values.dec.trim(),
-      fieldSizeDeg: values.fieldSizeDeg.trim().replace(/\s*deg\s*$/i, ""),
-      observationDate: values.observationDate.trim(),
+      ra: submissionValues.ra.trim(),
+      dec: submissionValues.dec.trim(),
+      fieldSizeDeg: submissionValues.fieldSizeDeg
+        .trim()
+        .replace(/\s*deg\s*$/i, ""),
+      observationDate: submissionValues.observationDate.trim(),
     });
   };
 
@@ -273,13 +299,13 @@ export function QueryPortalCard({
                 >
                   Observation Date
                 </label>
-                <input
-                  ref={dateInputRef}
+                <select
+                  ref={dateSelectRef}
                   id="portal-date"
                   name="observationDate"
-                  type="date"
                   required
-                  value={values.observationDate}
+                  disabled={availableDates.length === 0}
+                  value={selectedObservationDate}
                   onChange={(e) =>
                     handleFieldChange("observationDate", e.target.value)
                   }
@@ -292,8 +318,19 @@ export function QueryPortalCard({
                       ? "portal-date-error"
                       : undefined
                   }
-                  className="input input-bordered ae-field-input w-full"
-                />
+                  className="select select-bordered ae-field-input w-full"
+                >
+                  <option value="" disabled>
+                    {availableDates.length > 0
+                      ? "Select observation date"
+                      : "No observation dates available"}
+                  </option>
+                  {availableDates.map((dateOption) => (
+                    <option key={dateOption} value={dateOption}>
+                      {dateOption}
+                    </option>
+                  ))}
+                </select>
                 {visibleErrors.observationDate && (
                   <p
                     id="portal-date-error"

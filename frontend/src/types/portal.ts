@@ -10,6 +10,7 @@ export interface CoordinateMetadata {
   catalogId: string;
   instrument: string;
   availableBands: string[];
+  availableDates: string[];
   frameCount: number;
   observationWindow: string;
 }

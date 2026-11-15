@@ -27,11 +27,18 @@ export async function fetchCoordinateMetadata(
     ) {
       return null;
     }
+    const availableDates = Array.isArray(data.availableDates)
+      ? data.availableDates.filter(
+          (item): item is string => typeof item === "string" && item.length > 0
+        )
+      : [];
+
     return {
       targetName: data.targetName,
       catalogId: data.catalogId,
       instrument: typeof data.instrument === "string" ? data.instrument : "",
       availableBands: data.availableBands,
+      availableDates,
       frameCount: typeof data.frameCount === "number" ? data.frameCount : 0,
       observationWindow:
         typeof data.observationWindow === "string"
