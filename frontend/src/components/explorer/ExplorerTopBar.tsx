@@ -5,8 +5,8 @@ import {
   GitMerge,
   Layers,
   Menu,
-  Orbit,
   Redo2,
+  Telescope,
   Undo2,
 } from "lucide-react";
 import { APP_CONFIG, ICON_SIZES } from "../../config/app";
@@ -71,7 +71,7 @@ export function ExplorerTopBar({
         </button>
 
         <div className="flex items-center gap-2 text-sm font-semibold tracking-tight text-[var(--ae-text-primary)]">
-          <Orbit
+          <Telescope
             size={ICON_SIZES.navbarBrand}
             className="shrink-0 text-[var(--ae-primary)]"
             aria-hidden="true"
