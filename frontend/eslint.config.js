@@ -28,6 +28,22 @@ export default tseslint.config(
         "warn",
         { allowConstantExport: true },
       ],
+      "@typescript-eslint/no-magic-numbers": [
+        "error",
+        {
+          ignore: [-1, 0, 1],
+          ignoreEnums: true,
+          ignoreNumericLiteralTypes: true,
+          ignoreReadonlyClassProperties: true,
+          ignoreTypeIndexes: true,
+        },
+      ],
+    },
+  },
+  {
+    files: ["**/*.test.{ts,tsx}", "src/config/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-magic-numbers": "off",
     },
   }
 );

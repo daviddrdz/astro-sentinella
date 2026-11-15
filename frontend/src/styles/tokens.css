@@ -23,6 +23,13 @@
   --ae-status-warning: #e2b96f;
   --ae-status-error: #e06c75;
 
+  /* Backdrop Starfield Tokens */
+  --ae-star-muted: rgba(230, 237, 247, 0.25);
+  --ae-star-primary: rgba(99, 151, 232, 0.35);
+  --ae-star-dim: rgba(230, 237, 247, 0.2);
+  --ae-star-cyan: rgba(79, 209, 197, 0.28);
+  --ae-star-faint: rgba(230, 237, 247, 0.18);
+
   /* Typography - Responsive clamp() with 14px minimum */
   --ae-font-sans:
     "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
@@ -37,10 +44,13 @@
   --ae-text-xl: clamp(1.125rem, 1.05rem + 0.4vw, 1.375rem);
   --ae-text-2xl: clamp(1.375rem, 1.2rem + 0.8vw, 1.75rem);
 
-  /* Radii & Spacing */
+  /* Radii, Controls & Layout Spacing */
   --ae-radius-sm: 0.375rem;
   --ae-radius-md: 0.5rem;
   --ae-radius-lg: 0.75rem;
+  --ae-control-height: 2.75rem;
+  --ae-focus-ring-width: 2px;
+  --ae-focus-ring-offset: 2px;
 
   --ae-topbar-height: 3.25rem;
   --ae-toolbar-width: 3.25rem;
