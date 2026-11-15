@@ -1,4 +1,21 @@
+# Python / Backend
 /env
-env
+env/
+.venv/
+venv/
 __pycache__/
 *.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Node / Frontend
+node_modules/
+dist/
+coverage/
+.vite/
+
+# Environment & OS
+.env
+.env.*
+!.env.example
+.DS_Store
