@@ -19,7 +19,7 @@ describe("fetchExplorerFrames", () => {
       {
         id: "f-1",
         timestamp: "18:40Z",
-        band: "Band 1",
+        band: 1,
         filtered: false,
         visible: true,
       },

@@ -3,13 +3,9 @@ export type ExplorerLocale = "en" | "es";
 export type ExplorerToolId =
   "hand" | "zoom" | "split" | "subtract" | "region" | "ruler" | "reset";
 
-export type BandChannelId =
-  | "Band 1"
-  | "Band 2"
-  | "Band 3"
-  | "Band 4"
-  | "Band 5"
-  | "Band 6";
+export type BlendMode = "Normal" | "Subtract" | "Screen" | "Add";
+
+export type BandChannelId = 1 | 2 | 3 | 4 | 5 | 6;
 
 export type ChannelTintId =
   | "grey"
@@ -21,6 +17,17 @@ export type ChannelTintId =
 
 export type TimelineFilterTab = "all" | "visible" | "filtered";
 
+export interface ExplorerLayer {
+  id: string;
+  code: string;
+  band: BandChannelId;
+  bands: BandChannelId[];
+  blendMode: BlendMode;
+  opacity: number;
+  visible: boolean;
+  tint: ChannelTintId;
+}
+
 export interface ExplorerFrame {
   id: string;
   timestamp: string;
@@ -28,4 +35,10 @@ export interface ExplorerFrame {
   filtered: boolean;
   visible: boolean;
   imageUrl?: string;
+}
+
+export interface ExplorerSnapshot {
+  layers: ExplorerLayer[];
+  activeLayerId: string;
+  activeFrameIndex: number;
 }

@@ -2,8 +2,12 @@ import { SiGithub } from "@icons-pack/react-simple-icons";
 import {
   ArrowLeft,
   BookOpen,
+  GitMerge,
+  Layers,
   Menu,
+  Redo2,
   Telescope,
+  Undo2,
 } from "lucide-react";
 import { APP_CONFIG, ICON_SIZES } from "../../config/app";
 import { EXPLORER_CONFIG, EXPLORER_COPY } from "../../config/explorer";
@@ -13,9 +17,16 @@ import type { QueryParams } from "../../types/portal";
 interface ExplorerTopBarProps {
   query: QueryParams;
   locale: ExplorerLocale;
+  layerCount: number;
+  canUndo: boolean;
+  canRedo: boolean;
   onBackToPortal: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
+  onMergeExport: () => void;
   onOpenDocs: () => void;
   onToggleLocale: () => void;
+  onOpenMobileLayers: () => void;
 }
 
 function formatFieldSizeArcmin(fieldSizeDeg: string): string {
@@ -30,9 +41,16 @@ function formatFieldSizeArcmin(fieldSizeDeg: string): string {
 export function ExplorerTopBar({
   query,
   locale,
+  layerCount,
+  canUndo,
+  canRedo,
   onBackToPortal,
+  onUndo,
+  onRedo,
+  onMergeExport,
   onOpenDocs,
   onToggleLocale,
+  onOpenMobileLayers,
 }: ExplorerTopBarProps) {
   const copy = EXPLORER_COPY[locale];
   const arcminLabel = formatFieldSizeArcmin(query.fieldSizeDeg);
@@ -75,6 +93,38 @@ export function ExplorerTopBar({
 
       {/* Desktop actions */}
       <div className="hidden items-center gap-1.5 md:flex">
+        <button
+          type="button"
+          onClick={onUndo}
+          disabled={!canUndo}
+          aria-label={copy.undo}
+          title={copy.undo}
+          className="btn btn-ghost btn-sm btn-square text-[var(--ae-text-muted)] hover:text-[var(--ae-text-primary)] disabled:opacity-35"
+        >
+          <Undo2 size={EXPLORER_CONFIG.iconSizeMd} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          onClick={onRedo}
+          disabled={!canRedo}
+          aria-label={copy.redo}
+          title={copy.redo}
+          className="btn btn-ghost btn-sm btn-square text-[var(--ae-text-muted)] hover:text-[var(--ae-text-primary)] disabled:opacity-35"
+        >
+          <Redo2 size={EXPLORER_CONFIG.iconSizeMd} aria-hidden="true" />
+        </button>
+
+        <div className="mx-1 h-4 w-px bg-[var(--ae-border-subtle)]" />
+
+        <button
+          type="button"
+          onClick={onMergeExport}
+          className="btn btn-primary btn-sm gap-1.5 font-medium"
+        >
+          <GitMerge size={EXPLORER_CONFIG.iconSizeSm} aria-hidden="true" />
+          <span>{copy.mergeExport}</span>
+        </button>
+
         <button
           type="button"
           onClick={onOpenDocs}
@@ -124,6 +174,15 @@ export function ExplorerTopBar({
 
       {/* Mobile actions */}
       <div className="flex items-center gap-1.5 md:hidden">
+        <button
+          type="button"
+          onClick={onOpenMobileLayers}
+          className="btn btn-sm gap-1.5 border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-elevated)] text-[var(--ae-text-primary)]"
+        >
+          <Layers size={EXPLORER_CONFIG.iconSizeSm} aria-hidden="true" />
+          <span>{`${copy.layers} (${layerCount})`}</span>
+        </button>
+
         <div className="dropdown dropdown-end">
           <button
             type="button"
@@ -137,6 +196,27 @@ export function ExplorerTopBar({
             tabIndex={EXPLORER_CONFIG.firstIndex}
             className="menu dropdown-content z-30 mt-2 w-48 rounded-lg border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-elevated)] p-1.5 shadow-xl"
           >
+            <li>
+              <button type="button" onClick={onMergeExport}>
+                <GitMerge
+                  size={EXPLORER_CONFIG.iconSizeSm}
+                  aria-hidden="true"
+                />
+                {copy.mergeExport}
+              </button>
+            </li>
+            <li>
+              <button type="button" onClick={onUndo} disabled={!canUndo}>
+                <Undo2 size={EXPLORER_CONFIG.iconSizeSm} aria-hidden="true" />
+                {copy.undo}
+              </button>
+            </li>
+            <li>
+              <button type="button" onClick={onRedo} disabled={!canRedo}>
+                <Redo2 size={EXPLORER_CONFIG.iconSizeSm} aria-hidden="true" />
+                {copy.redo}
+              </button>
+            </li>
             <li>
               <button type="button" onClick={onOpenDocs}>
                 <BookOpen

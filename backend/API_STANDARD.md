@@ -6,7 +6,6 @@ This document defines conventions for implementing the Flask API consumed by the
 
 - `GET /api/metadata?ra={ra}&dec={dec}` returns coordinate metadata used to populate available observation dates.
 - `GET /api/frames?ra={ra}&dec={dec}&fieldSizeDeg={degrees}&observationDate={date}` returns the frames for an explorer query.
-- `GET /api/frames/image?...&color={colormap}` returns a rendered PNG using one of `grey`, `viridis`, `magma`, `inferno`, `cividis`, or `cubehelix`; `magma` is the default.
 
 Keep these contracts aligned with the frontend types and service validation in `frontend/src/types/portal.ts`, `frontend/src/types/explorer.ts`, `frontend/src/services/metadataService.ts`, and `frontend/src/services/framesService.ts`.
 

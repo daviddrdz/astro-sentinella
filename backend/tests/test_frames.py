@@ -62,8 +62,8 @@ def test_select_image_picks_earliest_on_date():
 def test_image_route_returns_png(client, monkeypatch):
     calls = []
 
-    def fake(*args, **kwargs):
-        calls.append((args, kwargs))
+    def fake(ra, dec, obs_date):
+        calls.append((ra, dec, obs_date))
         return b"\x89PNG fake"
 
     monkeypatch.setattr("routes.frames.get_sky_image_png", fake)
@@ -72,37 +72,7 @@ def test_image_route_returns_png(client, monkeypatch):
     assert resp.status_code == 200
     assert resp.mimetype == "image/png"
     assert resp.data == b"\x89PNG fake"
-    assert calls == [
-        ((133.795, -7.2455, date(2025, 5, 1)), {"color": "magma"})
-    ]
-
-
-def test_image_route_accepts_render_color(client, monkeypatch):
-    calls = []
-
-    def fake(*args, **kwargs):
-        calls.append((args, kwargs))
-        return b"\x89PNG fake"
-
-    monkeypatch.setattr("routes.frames.get_sky_image_png", fake)
-    resp = client.get(
-        "/api/frames/image",
-        query_string={**VALID_ARGS, "color": "inferno"},
-    )
-
-    assert resp.status_code == 200
-    assert calls == [
-        ((133.795, -7.2455, date(2025, 5, 1)), {"color": "inferno"})
-    ]
-
-
-def test_image_route_rejects_invalid_render_color(client):
-    resp = client.get(
-        "/api/frames/image",
-        query_string={**VALID_ARGS, "color": "rainbow"},
-    )
-    assert resp.status_code == 400
-    assert resp.get_json()["error"]["code"] == "invalid_request"
+    assert calls == [(133.795, -7.2455, date(2025, 5, 1))]
 
 
 def test_image_route_rejects_invalid_query(client):
@@ -112,7 +82,7 @@ def test_image_route_rejects_invalid_query(client):
 
 
 def test_image_route_returns_404_when_no_image_on_date(client, monkeypatch):
-    def fake(*_, **__):
+    def fake(*_):
         raise ImageNotFoundError("No image found.")
 
     monkeypatch.setattr("routes.frames.get_sky_image_png", fake)
@@ -122,7 +92,7 @@ def test_image_route_returns_404_when_no_image_on_date(client, monkeypatch):
 
 
 def test_image_route_hides_upstream_errors(client, monkeypatch):
-    def fake(*_, **__):
+    def fake(*_):
         raise ArchiveUnavailableError("secret upstream detail")
 
     monkeypatch.setattr("routes.frames.get_sky_image_png", fake)
@@ -140,35 +110,6 @@ def test_render_png_produces_png_bytes(monkeypatch, tmp_path):
 
     png = frames_service._render_png(str(path))
     assert png.startswith(b"\x89PNG")
-
-
-def test_render_png_reuses_download_for_different_colors(monkeypatch):
-    import numpy as np
-    from astropy.wcs import WCS
-
-    calls = []
-
-    def download(source, ra_deg, dec_deg, size_deg):
-        calls.append((source, ra_deg, dec_deg, size_deg))
-        return np.arange(256, dtype=float).reshape(16, 16), WCS()
-
-    monkeypatch.setattr(
-        frames_service,
-        "_find_image_url",
-        lambda *_: "https://example/img.fits",
-    )
-    monkeypatch.setattr(frames_service, "_download_render_image", download)
-
-    first = frames_service.get_sky_image_png(
-        133.795, -7.2455, date(2025, 5, 1), 0.5, "magma"
-    )
-    second = frames_service.get_sky_image_png(
-        133.795, -7.2455, date(2025, 5, 1), 0.5, "inferno"
-    )
-
-    assert first.startswith(b"\x89PNG")
-    assert second.startswith(b"\x89PNG")
-    assert len(calls) == 1
 
 
 def test_render_image_png_supports_multiple_bands():

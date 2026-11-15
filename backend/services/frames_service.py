@@ -12,7 +12,6 @@ from services.irsa_archive import ArchiveUnavailableError, search_images
 conf.remote_timeout = 120
 
 PNG_CACHE = TTLCache(ttl_s=3600, max_items=32)
-FITS_CACHE = TTLCache(ttl_s=3600, max_items=32)
 
 
 class ImageNotFoundError(Exception):
@@ -57,7 +56,7 @@ def list_frames_for_date(
             {
                 "id": f"spherex-{row_idx}",
                 "timestamp": dt.strftime("%H:%MZ"),
-                "band": "IR",
+                "band": 2,
                 "filtered": False,
                 "visible": True,
                 "imageUrl": (
@@ -84,15 +83,21 @@ def _render_png(
     dec_deg: float = 0.0,
     size_deg: float = 0.05,
     color: str = "magma",
+    bands: tuple[int, ...] | None = None,
 ) -> bytes:
     try:
+        coords = {"ra": ra_deg, "dec": dec_deg}
+        if bands:
+            coords["sources"] = {band: fits_url for band in bands}
+        else:
+            coords["source"] = fits_url
         return render_image_png(
-            {"source": fits_url, "ra": ra_deg, "dec": dec_deg},
-            size=None,
+            coords,
             color=color,
-            image_loader=lambda source: FITS_CACHE.get_or_compute(
-                (source, round(ra_deg, 5), round(dec_deg, 5), size_deg),
-                lambda: _download_render_image(source, ra_deg, dec_deg, size_deg),
+            bands=bands,
+            size=None,
+            image_loader=lambda source: _download_render_image(
+                source, ra_deg, dec_deg, size_deg
             ),
         )
     except OSError as exc:
@@ -104,12 +109,17 @@ def _download_render_image(fits_url, ra_deg, dec_deg, size_deg):
 
 
 def get_sky_image_png(
-    ra_deg, dec_deg, observation_date, size_deg=0.05, color="magma"
+    ra_deg,
+    dec_deg,
+    observation_date,
+    size_deg=0.05,
+    color="magma",
+    bands: tuple[int, ...] | None = None,
 ) -> bytes:
-    key = (round(ra_deg, 5), round(dec_deg, 5), observation_date, size_deg, color)
+    key = (round(ra_deg, 5), round(dec_deg, 5), observation_date, size_deg, color, bands)
 
     def compute():
         fits_url = _find_image_url(ra_deg, dec_deg, observation_date)
-        return _render_png(fits_url, ra_deg, dec_deg, size_deg, color)
+        return _render_png(fits_url, ra_deg, dec_deg, size_deg, color, bands)
 
     return PNG_CACHE.get_or_compute(key, compute)

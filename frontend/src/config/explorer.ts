@@ -1,7 +1,9 @@
 import type {
   BandChannelId,
+  BlendMode,
   ChannelTintId,
   ExplorerFrame,
+  ExplorerLayer,
   ExplorerLocale,
   ExplorerToolId,
   TimelineFilterTab,
@@ -57,33 +59,39 @@ export const EXPLORER_TOOLS: readonly ToolOption[] = [
   },
 ];
 
+export const BLEND_MODES: readonly BlendMode[] = [
+  "Normal",
+  "Subtract",
+  "Screen",
+  "Add",
+];
+
 export interface BandChannelOption {
   id: BandChannelId;
   label: string;
 }
 
 export const BAND_CHANNELS: readonly BandChannelOption[] = [
-  { id: "Band 1", label: "Band 1 (0.75 – 1.10 µm) — Optical / Near-IR" },
-  { id: "Band 2", label: "Band 2 (1.10 – 1.58 µm) — Near-Infrared" },
-  { id: "Band 3", label: "Band 3 (1.58 – 2.14 µm) — Near-Infrared" },
-  { id: "Band 4", label: "Band 4 (2.14 – 2.82 µm) — Mid-Near Infrared" },
-  { id: "Band 5", label: "Band 5 (2.82 – 3.80 µm) — Infrared" },
-  { id: "Band 6", label: "Band 6 (3.80 – 5.00 µm) — Deep Infrared" },
+  { id: 1, label: "Band 1 (0.75 – 1.10 µm) — Optical / Near-IR" },
+  { id: 2, label: "Band 2 (1.10 – 1.58 µm) — Near-Infrared" },
+  { id: 3, label: "Band 3 (1.58 – 2.14 µm) — Near-Infrared" },
+  { id: 4, label: "Band 4 (2.14 – 2.82 µm) — Mid-Near Infrared" },
+  { id: 5, label: "Band 5 (2.82 – 3.80 µm) — Infrared" },
+  { id: 6, label: "Band 6 (3.80 – 5.00 µm) — Deep Infrared" },
 ];
 
 export interface ChannelTintOption {
   id: ChannelTintId;
-  label: Record<ExplorerLocale, string>;
-  hex: string;
+  label: string;
 }
 
 export const CHANNEL_TINTS: readonly ChannelTintOption[] = [
-  { id: "grey", label: { en: "grey", es: "grey" }, hex: "#808080" },
-  { id: "viridis", label: { en: "viridis", es: "viridis" }, hex: "#35B779" },
-  { id: "magma", label: { en: "magma", es: "magma" }, hex: "#B73779" },
-  { id: "inferno", label: { en: "inferno", es: "inferno" }, hex: "#F1602F" },
-  { id: "cividis", label: { en: "cividis", es: "cividis" }, hex: "#C8B84A" },
-  { id: "cubehelix", label: { en: "cubehelix", es: "cubehelix" }, hex: "#8C6BB1" },
+  { id: "grey", label: "grey" },
+  { id: "viridis", label: "viridis" },
+  { id: "magma", label: "magma" },
+  { id: "inferno", label: "inferno" },
+  { id: "cividis", label: "cividis" },
+  { id: "cubehelix", label: "cubehelix" },
 ];
 
 export interface TimelineTabOption {
@@ -101,12 +109,19 @@ export const EXPLORER_COPY: Record<
   ExplorerLocale,
   {
     backToPortal: string;
+    mergeExport: string;
     docs: string;
     github: string;
+    layers: string;
+    addLayer: string;
+    blendMode: string;
     bandChannel: string;
     channelTint: string;
+    opacity: string;
+    mergeVisible: string;
     timeline: string;
     bandAll: string;
+    bandPrefix: string;
     play: string;
     pause: string;
     stepBack: string;
@@ -114,6 +129,8 @@ export const EXPLORER_COPY: Record<
     undo: string;
     redo: string;
     noFrames: string;
+    noLayers: string;
+    toggleVisibility: string;
     close: string;
     loadingFrame: string;
     frameUnavailable: string;
@@ -122,12 +139,19 @@ export const EXPLORER_COPY: Record<
 > = {
   en: {
     backToPortal: "Back to Portal",
+    mergeExport: "Merge / Export",
     docs: "Docs",
     github: "GitHub",
-    bandChannel: "Detectors",
+    layers: "Layers",
+    addLayer: "+ Add",
+    blendMode: "Blend Mode",
+    bandChannel: "Band / Channel",
     channelTint: "Channel Tint",
+    opacity: "Opacity",
+    mergeVisible: "Merge Visible",
     timeline: "Timeline",
-    bandAll: "Detectors: All",
+    bandAll: "Band: All",
+    bandPrefix: "Band:",
     play: "Play",
     pause: "Pause",
     stepBack: "Previous frame",
@@ -135,6 +159,8 @@ export const EXPLORER_COPY: Record<
     undo: "Undo",
     redo: "Redo",
     noFrames: "No frames match the selected filter.",
+    noLayers: "No layers loaded.",
+    toggleVisibility: "Toggle layer visibility",
     close: "Close",
     loadingFrame: "Loading SPHEREx cutout...",
     frameUnavailable:
@@ -143,12 +169,19 @@ export const EXPLORER_COPY: Record<
   },
   es: {
     backToPortal: "Volver al Portal",
+    mergeExport: "Combinar / Exportar",
     docs: "Docs",
     github: "GitHub",
-    bandChannel: "Detectores",
+    layers: "Capas",
+    addLayer: "+ Añadir",
+    blendMode: "Modo de mezcla",
+    bandChannel: "Banda / Canal",
     channelTint: "Tinte de canal",
+    opacity: "Opacidad",
+    mergeVisible: "Combinar visibles",
     timeline: "Línea de tiempo",
-    bandAll: "Detectores: Todos",
+    bandAll: "Banda: Todas",
+    bandPrefix: "Banda:",
     play: "Reproducir",
     pause: "Pausar",
     stepBack: "Fotograma anterior",
@@ -156,6 +189,8 @@ export const EXPLORER_COPY: Record<
     undo: "Deshacer",
     redo: "Rehacer",
     noFrames: "Ningún fotograma coincide con el filtro.",
+    noLayers: "No hay capas cargadas.",
+    toggleVisibility: "Alternar visibilidad de capa",
     close: "Cerrar",
     loadingFrame: "Cargando recorte SPHEREx...",
     frameUnavailable:
@@ -164,60 +199,83 @@ export const EXPLORER_COPY: Record<
   },
 };
 
+export const DEFAULT_EXPLORER_LAYERS: readonly ExplorerLayer[] = [
+  {
+    id: "frm-02",
+    code: "FRM-02",
+    band: 2,
+    bands: [2],
+    blendMode: "Normal",
+    opacity: 70,
+    visible: true,
+    tint: "magma",
+  },
+  {
+    id: "frm-01",
+    code: "FRM-01",
+    band: 1,
+    bands: [1],
+    blendMode: "Normal",
+    opacity: 0,
+    visible: false,
+    tint: "grey",
+  },
+];
+
 export const DEFAULT_EXPLORER_FRAMES: readonly ExplorerFrame[] = [
   {
     id: "f-1810",
     timestamp: "18:10Z",
-    band: "Band 1",
+    band: 1,
     filtered: false,
     visible: false,
   },
   {
     id: "f-1820",
     timestamp: "18:20Z",
-    band: "Band 2",
+    band: 2,
     filtered: false,
     visible: true,
   },
   {
     id: "f-1830",
     timestamp: "18:30Z",
-    band: "Band 3",
+    band: 3,
     filtered: false,
     visible: true,
   },
   {
     id: "f-1840",
     timestamp: "18:40Z",
-    band: "Band 4",
+    band: 1,
     filtered: false,
     visible: true,
   },
   {
     id: "f-1850",
     timestamp: "18:50Z",
-    band: "Band 5",
+    band: 1,
     filtered: true,
     visible: true,
   },
   {
     id: "f-1900",
     timestamp: "19:00Z",
-    band: "Band 3",
+    band: 3,
     filtered: false,
     visible: true,
   },
   {
     id: "f-1910",
     timestamp: "19:10Z",
-    band: "Band 2",
+    band: 2,
     filtered: false,
     visible: true,
   },
   {
     id: "f-1920",
     timestamp: "19:20Z",
-    band: "Band 6",
+    band: 6,
     filtered: false,
     visible: true,
   },

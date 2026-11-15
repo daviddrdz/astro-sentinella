@@ -119,7 +119,7 @@ export function ExplorerTimeline({
             <option value="all">{copy.bandAll}</option>
             {BAND_CHANNELS.map((band) => (
               <option key={band.id} value={band.id}>
-                {band.label}
+                {`${copy.bandPrefix} ${band.id}`}
               </option>
             ))}
           </select>

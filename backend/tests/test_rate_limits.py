@@ -10,9 +10,7 @@ IMAGE_ARGS = {**METADATA_ARGS, "observationDate": "2025-05-01"}
 def client(monkeypatch):
     monkeypatch.setitem(app.config, "METADATA_RATE_LIMIT", "2 per minute")
     monkeypatch.setitem(app.config, "FRAME_IMAGE_RATE_LIMIT", "1 per minute")
-    monkeypatch.setattr(
-        "routes.frames.get_sky_image_png", lambda *_, **__: b"\x89PNG"
-    )
+    monkeypatch.setattr("routes.frames.get_sky_image_png", lambda *_: b"\x89PNG")
     monkeypatch.setattr(
         "routes.metadata.get_coordinate_metadata",
         lambda *_: pytest.fail("metadata lookup should not run for these requests"),

@@ -1,7 +1,7 @@
 from flask import Blueprint, Response, current_app, jsonify, request
 
 from routes.errors import error_response
-from schemas.query import QueryValidationError, parse_render_color, parse_sky_image_query
+from schemas.query import QueryValidationError, parse_sky_image_query
 from services.frames_service import (
     ImageNotFoundError,
     get_sky_image_png,
@@ -37,26 +37,20 @@ def list_frames():
 def frame_image():
     try:
         query = parse_sky_image_query(request.args)
-        color = parse_render_color(request.args)
     except QueryValidationError as exc:
         return error_response(400, "invalid_request", str(exc))
 
     try:
+        options = {}
         if "fieldSizeDeg" in request.args:
-            png_bytes = get_sky_image_png(
-                query.ra_deg,
-                query.dec_deg,
-                query.observation_date,
-                query.field_size_deg,
-                color,
-            )
-        else:
-            png_bytes = get_sky_image_png(
-                query.ra_deg,
-                query.dec_deg,
-                query.observation_date,
-                color=color,
-            )
+            options["size_deg"] = query.field_size_deg
+        if "color" in request.args:
+            options["color"] = query.color
+        if "bands" in request.args:
+            options["bands"] = query.bands or None
+        png_bytes = get_sky_image_png(
+            query.ra_deg, query.dec_deg, query.observation_date, **options
+        )
     except ImageNotFoundError as exc:
         return error_response(404, "image_not_found", str(exc))
     except ArchiveUnavailableError:
