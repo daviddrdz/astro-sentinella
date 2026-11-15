@@ -87,8 +87,8 @@ describe("Astro Sentinella Portal", () => {
     ).toBeInTheDocument();
   });
 
-  it("hides metadata panel, falls back to default Observation Date, and continues query when no metadata is available", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+  it("shows preview empty state with retry when no observation dates are found, and retries on click", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: false,
       status: 404,
     } as Response);
@@ -102,15 +102,18 @@ describe("Astro Sentinella Portal", () => {
       target: { value: PORTAL_PLACEHOLDERS.dec },
     });
 
-    await waitFor(() => {
-      expect(globalThis.fetch).toHaveBeenCalled();
-    });
+    expect(
+      await screen.findByText("No observation dates found in preview.")
+    ).toBeInTheDocument();
     expect(
       screen.queryByLabelText("Available coordinate metadata")
     ).not.toBeInTheDocument();
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
 
-    const dateSelect = screen.getByLabelText("Observation Date");
-    expect(dateSelect).toHaveValue(PORTAL_PLACEHOLDERS.observationDate);
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+    });
 
     fireEvent.change(screen.getByLabelText("Field Size (deg)"), {
       target: { value: "0.5" },
@@ -156,7 +159,7 @@ describe("Astro Sentinella Portal", () => {
       target: { value: "0.5" },
     });
 
-    const dateSelect = screen.getByLabelText("Observation Date");
+    const dateSelect = await screen.findByLabelText("Observation Date");
     await waitFor(() => {
       expect(dateSelect).toBeEnabled();
     });
