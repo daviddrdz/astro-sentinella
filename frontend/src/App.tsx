@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { DocsModal } from "./components/DocsModal";
-import { ExplorerPlaceholder } from "./components/ExplorerPlaceholder";
+import { ExplorerView } from "./components/explorer/ExplorerView";
 import { PortalNavbar } from "./components/PortalNavbar";
 import { QueryPortalCard } from "./components/QueryPortalCard";
 import type { QueryParams } from "./types/portal";
@@ -11,7 +11,7 @@ export default function App() {
 
   if (activeQuery) {
     return (
-      <ExplorerPlaceholder
+      <ExplorerView
         query={activeQuery}
         onBackToPortal={() => setActiveQuery(null)}
       />

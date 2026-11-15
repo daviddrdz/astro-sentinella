@@ -153,16 +153,14 @@ describe("Astro Earth Portal", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Query" }));
 
+    expect(screen.getByRole("heading", { name: "Layers" })).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "Explorer" })
+      screen.getByText(
+        `${PORTAL_PLACEHOLDERS.ra} | ${PORTAL_PLACEHOLDERS.dec} | 30 arcmin | ${PORTAL_PLACEHOLDERS.observationDate}`
+      )
     ).toBeInTheDocument();
-    expect(
-      screen.getAllByText(
-        `${PORTAL_PLACEHOLDERS.ra} | ${PORTAL_PLACEHOLDERS.dec} | 0.5 deg | ${PORTAL_PLACEHOLDERS.observationDate}`
-      ).length
-    ).toBeGreaterThan(0);
 
-    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    fireEvent.click(screen.getByRole("button", { name: "Back to Portal" }));
     expect(screen.getByRole("button", { name: "Query" })).toBeInTheDocument();
   });
 
