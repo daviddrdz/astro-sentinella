@@ -1,0 +1,10 @@
+set -e
+
+cd frontend
+pnpm run format:check
+pnpm run lint
+pnpm run typecheck
+pnpm run test
+
+cd ..
+python3 -m py_compile backend/app.py
