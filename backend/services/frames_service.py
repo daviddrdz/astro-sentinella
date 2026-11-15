@@ -8,6 +8,7 @@ from astropy.time import Time
 from astropy.utils.data import conf
 from astropy.visualization import AsymmetricPercentileInterval, AsinhStretch, ImageNormalize
 from matplotlib.figure import Figure
+from services.cache import TTLCache
 
 from services.irsa_archive import ArchiveUnavailableError, search_images, with_retries
 
@@ -27,6 +28,8 @@ BAD_PIXEL_MASK = (
     | (1 << 11)  # COLD
     | (1 << 27)  # SNOWBALL
 )
+
+PNG_CACHE = TTLCache(ttl_s=3600, max_items=32)
 
 
 class ImageNotFoundError(Exception):
@@ -160,8 +163,11 @@ def _render_png(
     return buf.getvalue()
 
 
-def get_sky_image_png(
-    ra_deg: float, dec_deg: float, observation_date: date, size_deg: float = 0.05
-) -> bytes:
-    fits_url = _find_image_url(ra_deg, dec_deg, observation_date)
-    return _render_png(fits_url, ra_deg, dec_deg, size_deg)
+def get_sky_image_png(ra_deg, dec_deg, observation_date, size_deg=0.05) -> bytes:
+    key = (round(ra_deg, 5), round(dec_deg, 5), observation_date, size_deg)
+
+    def compute():
+        fits_url = _find_image_url(ra_deg, dec_deg, observation_date)
+        return _render_png(fits_url, ra_deg, dec_deg, size_deg)
+
+    return PNG_CACHE.get_or_compute(key, compute)
