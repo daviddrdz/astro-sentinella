@@ -5,6 +5,7 @@ import {
   EXPLORER_CONFIG,
 } from "../../config/explorer";
 import { fetchExplorerFrames } from "../../services/framesService";
+import { fetchCoordinateMetadata } from "../../services/metadataService";
 import type {
   BandChannelId,
   ExplorerFrame,
@@ -71,7 +72,48 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetchExplorerFrames(query, controller.signal).then((remoteFrames) => {
+    Promise.all([
+      fetchCoordinateMetadata(query.ra, query.dec, controller.signal),
+      fetchExplorerFrames(query, controller.signal),
+    ]).then(([metadata, remoteFrames]) => {
+      if (controller.signal.aborted) {
+        return;
+      }
+
+      if (
+        metadata &&
+        metadata.availableDates.length > EXPLORER_CONFIG.firstIndex
+      ) {
+        const dateFrames: ExplorerFrame[] = metadata.availableDates.map(
+          (obsDate) => {
+            const imgParams = new URLSearchParams({
+              ra: query.ra.trim(),
+              dec: query.dec.trim(),
+              fieldSizeDeg: query.fieldSizeDeg.trim(),
+              observationDate: obsDate,
+            });
+            return {
+              id: `date-${obsDate}`,
+              timestamp: obsDate,
+              band: "IR",
+              filtered: false,
+              visible: true,
+              imageUrl: `${EXPLORER_CONFIG.framesEndpoint}/image?${imgParams.toString()}`,
+            };
+          }
+        );
+        setFrames(dateFrames);
+        const matchingFrame = dateFrames.find(
+          (frame) => frame.timestamp === query.observationDate.trim()
+        );
+        setActiveFrameId(
+          matchingFrame?.id ??
+            dateFrames[EXPLORER_CONFIG.firstIndex]?.id ??
+            null
+        );
+        return;
+      }
+
       if (remoteFrames.length > EXPLORER_CONFIG.firstIndex) {
         setFrames(remoteFrames);
         setActiveFrameId(getInitialFrameId(remoteFrames));
@@ -313,6 +355,7 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
           activeFrame={activeFrame}
           activeTool={activeTool}
           zoomLevel={zoomLevel}
+          locale={locale}
           onCanvasClick={handleCanvasClick}
         />
 
