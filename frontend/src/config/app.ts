@@ -2,6 +2,7 @@ export const APP_CONFIG = {
   name: "Astro Sentinella",
   githubUrl: "https://github.com/daviddrdz/astro-sentinella",
   metadataEndpoint: "/api/metadata",
+  metadataDebounceMs: 600,
 } as const;
 
 export const COORDINATE_LIMITS = {

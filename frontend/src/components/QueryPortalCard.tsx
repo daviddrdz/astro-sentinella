@@ -1,5 +1,12 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { AlertCircle, Database, Layers, Telescope } from "lucide-react";
+import {
+  AlertCircle,
+  Database,
+  Layers,
+  Loader2,
+  RotateCw,
+  Telescope,
+} from "lucide-react";
 import {
   APP_CONFIG,
   PORTAL_HISTORY_CONFIG,
@@ -20,6 +27,7 @@ import {
 interface QueryPortalCardProps {
   initialValues?: QueryParams;
   onSubmitQuery: (params: QueryParams) => void;
+  onCoordinatesChange?: (ra: string, dec: string, fieldSizeDeg: string) => void;
 }
 
 const EMPTY_VALUES: QueryParams = {
@@ -34,6 +42,7 @@ type TouchedFields = Partial<Record<keyof QueryParams, boolean>>;
 export function QueryPortalCard({
   initialValues = EMPTY_VALUES,
   onSubmitQuery,
+  onCoordinatesChange,
 }: QueryPortalCardProps) {
   const headingId = useId();
   const raInputRef = useRef<HTMLInputElement>(null);
@@ -52,12 +61,39 @@ export function QueryPortalCard({
   >(null);
   const [fetchedMetadata, setFetchedMetadata] = useState<{
     key: string;
-    data: CoordinateMetadata;
+    data: CoordinateMetadata | null;
   } | null>(null);
+  const [debouncedCoords, setDebouncedCoords] = useState<{
+    ra: string;
+    dec: string;
+    fieldSizeDeg: string;
+  }>({
+    ra: initialValues.ra,
+    dec: initialValues.dec,
+    fieldSizeDeg: initialValues.fieldSizeDeg,
+  });
+  const [retryToken, setRetryToken] = useState<number>(
+    PORTAL_HISTORY_CONFIG.emptyLength
+  );
 
-  const coordinatesReady = hasValidCoordinates(values.ra, values.dec);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedCoords({
+        ra: values.ra,
+        dec: values.dec,
+        fieldSizeDeg: values.fieldSizeDeg,
+      });
+    }, APP_CONFIG.metadataDebounceMs);
+
+    return () => window.clearTimeout(timer);
+  }, [values.ra, values.dec, values.fieldSizeDeg]);
+
+  const coordinatesReady = hasValidCoordinates(
+    debouncedCoords.ra,
+    debouncedCoords.dec
+  );
   const coordinateKey = coordinatesReady
-    ? `${values.ra.trim()}|${values.dec.trim()}`
+    ? `${debouncedCoords.ra.trim()}|${debouncedCoords.dec.trim()}`
     : "";
 
   useEffect(() => {
@@ -66,21 +102,31 @@ export function QueryPortalCard({
     }
 
     const controller = new AbortController();
-    fetchCoordinateMetadata(values.ra, values.dec, controller.signal).then(
-      (data) => {
-        if (!controller.signal.aborted && data) {
-          setFetchedMetadata({ key: coordinateKey, data });
-        }
+    fetchCoordinateMetadata(
+      debouncedCoords.ra,
+      debouncedCoords.dec,
+      controller.signal
+    ).then((data) => {
+      if (!controller.signal.aborted) {
+        setFetchedMetadata({ key: coordinateKey, data });
       }
-    );
+    });
 
     return () => controller.abort();
-  }, [coordinatesReady, coordinateKey, values.ra, values.dec]);
+  }, [
+    coordinatesReady,
+    coordinateKey,
+    debouncedCoords.ra,
+    debouncedCoords.dec,
+    retryToken,
+  ]);
 
-  const coordinateMetadata =
-    coordinatesReady && fetchedMetadata?.key === coordinateKey
-      ? fetchedMetadata.data
-      : null;
+  const hasMetadataResult =
+    coordinatesReady && fetchedMetadata?.key === coordinateKey;
+  const isFetchingMetadata = coordinatesReady && !hasMetadataResult;
+  const coordinateMetadata = hasMetadataResult
+    ? (fetchedMetadata?.data ?? null)
+    : null;
 
   const availableDates = useMemo(
     () => coordinateMetadata?.availableDates ?? [],
@@ -88,7 +134,7 @@ export function QueryPortalCard({
   );
 
   const selectedObservationDate =
-    availableDates.length === 0
+    availableDates.length === PORTAL_HISTORY_CONFIG.emptyLength
       ? PORTAL_PLACEHOLDERS.observationDate
       : availableDates.includes(values.observationDate)
         ? values.observationDate
@@ -116,6 +162,19 @@ export function QueryPortalCard({
   const handleFieldChange = (field: keyof QueryParams, nextValue: string) => {
     setValues((prev) => ({ ...prev, [field]: nextValue }));
   };
+
+  useEffect(() => {
+    onCoordinatesChange?.(
+      debouncedCoords.ra,
+      debouncedCoords.dec,
+      debouncedCoords.fieldSizeDeg
+    );
+  }, [
+    debouncedCoords.ra,
+    debouncedCoords.dec,
+    debouncedCoords.fieldSizeDeg,
+    onCoordinatesChange,
+  ]);
 
   const handleFieldBlur = (field: keyof QueryParams) => {
     if (values[field].trim() !== "" || hasSubmitted) {
@@ -146,7 +205,9 @@ export function QueryPortalCard({
     };
     const submissionErrors = validateQueryParams(submissionValues);
 
-    if (Object.keys(submissionErrors).length > 0) {
+    if (
+      Object.keys(submissionErrors).length > PORTAL_HISTORY_CONFIG.emptyLength
+    ) {
       focusFirstInvalidField(submissionErrors);
       return;
     }
@@ -219,6 +280,13 @@ export function QueryPortalCard({
       PORTAL_HISTORY_CONFIG.maxSuggestions
     );
   }, [history, values.dec]);
+
+  const handleRetryMetadata = () => {
+    setFetchedMetadata(null);
+    setRetryToken((prev) => prev + PORTAL_HISTORY_CONFIG.sortPrioritySecond);
+  };
+
+  const showDateSlot = coordinatesReady;
 
   return (
     <section className="w-full max-w-2xl">
@@ -451,7 +519,7 @@ export function QueryPortalCard({
             </div>
 
             <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-3">
-              {coordinatesReady && (
+              {showDateSlot && (
                 <div className="ae-slide-down flex flex-col gap-1.5 sm:col-span-2">
                   <label
                     htmlFor="portal-date"
@@ -459,28 +527,42 @@ export function QueryPortalCard({
                   >
                     Observation Date
                   </label>
-                  <select
-                    ref={dateSelectRef}
-                    id="portal-date"
-                    name="observationDate"
-                    required
-                    value={selectedObservationDate}
-                    onChange={(e) =>
-                      handleFieldChange("observationDate", e.target.value)
-                    }
-                    onBlur={() => handleFieldBlur("observationDate")}
-                    aria-invalid={
-                      visibleErrors.observationDate ? "true" : "false"
-                    }
-                    aria-describedby={
-                      visibleErrors.observationDate
-                        ? "portal-date-error"
-                        : undefined
-                    }
-                    className="select select-bordered ae-field-input w-full"
-                  >
-                    {availableDates.length > 0 ? (
-                      <>
+
+                  {isFetchingMetadata || !hasMetadataResult ? (
+                    <div
+                      role="status"
+                      aria-live="polite"
+                      className="flex min-h-[var(--ae-control-height)] items-center gap-2.5 rounded-lg border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-elevated)] px-3 text-[length:var(--ae-text-sm)] text-[var(--ae-text-muted)]"
+                    >
+                      <Loader2
+                        className="h-4 w-4 shrink-0 animate-spin text-[var(--ae-primary)]"
+                        aria-hidden="true"
+                      />
+                      <span>Checking available observation dates...</span>
+                    </div>
+                  ) : availableDates.length >
+                    PORTAL_HISTORY_CONFIG.emptyLength ? (
+                    <>
+                      <select
+                        ref={dateSelectRef}
+                        id="portal-date"
+                        name="observationDate"
+                        required
+                        value={selectedObservationDate}
+                        onChange={(e) =>
+                          handleFieldChange("observationDate", e.target.value)
+                        }
+                        onBlur={() => handleFieldBlur("observationDate")}
+                        aria-invalid={
+                          visibleErrors.observationDate ? "true" : "false"
+                        }
+                        aria-describedby={
+                          visibleErrors.observationDate
+                            ? "portal-date-error"
+                            : undefined
+                        }
+                        className="select select-bordered ae-field-input w-full"
+                      >
                         <option value="" disabled>
                           Select observation date
                         </option>
@@ -489,31 +571,42 @@ export function QueryPortalCard({
                             {dateOption}
                           </option>
                         ))}
-                      </>
-                    ) : (
-                      <option value={PORTAL_PLACEHOLDERS.observationDate}>
-                        {`Default (${PORTAL_PLACEHOLDERS.observationDate})`}
-                      </option>
-                    )}
-                  </select>
-                  {visibleErrors.observationDate && (
-                    <p
-                      id="portal-date-error"
-                      className="flex items-start gap-1.5 text-[length:var(--ae-text-sm)] text-[var(--ae-status-error)]"
-                    >
-                      <AlertCircle
-                        className="mt-0.5 h-4 w-4 shrink-0"
-                        aria-hidden="true"
-                      />
-                      <span>{visibleErrors.observationDate}</span>
-                    </p>
+                      </select>
+                      {visibleErrors.observationDate && (
+                        <p
+                          id="portal-date-error"
+                          className="flex items-start gap-1.5 text-[length:var(--ae-text-sm)] text-[var(--ae-status-error)]"
+                        >
+                          <AlertCircle
+                            className="mt-0.5 h-4 w-4 shrink-0"
+                            aria-hidden="true"
+                          />
+                          <span>{visibleErrors.observationDate}</span>
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <div className="flex min-h-[var(--ae-control-height)] items-center justify-between gap-2 rounded-lg border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-elevated)] px-3 text-[length:var(--ae-text-sm)] text-[var(--ae-text-muted)]">
+                      <span>No observation dates found in preview.</span>
+                      <button
+                        type="button"
+                        onClick={handleRetryMetadata}
+                        className="btn btn-ghost btn-xs gap-1 text-[var(--ae-primary)] hover:bg-[var(--ae-primary)]/10"
+                      >
+                        <RotateCw
+                          className="h-3.5 w-3.5 shrink-0"
+                          aria-hidden="true"
+                        />
+                        <span>Retry</span>
+                      </button>
+                    </div>
                   )}
                 </div>
               )}
 
               <div
                 className={`flex flex-col justify-end ${
-                  coordinatesReady ? "" : "sm:col-span-3"
+                  showDateSlot ? "" : "sm:col-span-3"
                 }`}
               >
                 <button
