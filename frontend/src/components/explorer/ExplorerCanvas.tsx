@@ -15,6 +15,12 @@ interface ExplorerCanvasProps {
   onCanvasClick: () => void;
 }
 
+type ImageSourceCarrier = {
+  imageUrl?: string;
+  url?: string;
+  src?: string;
+};
+
 function getTintHex(tintId: ExplorerLayer["tint"]): string {
   const match = CHANNEL_TINTS.find((item) => item.id === tintId);
   return match ? match.hex : "#4BA39B";
@@ -50,6 +56,24 @@ function mapBlendMode(
     case "Normal":
       return "normal";
   }
+}
+
+function resolveLayerImageUrl(
+  layer: ExplorerLayer,
+  activeFrame: ExplorerFrame | null
+): string | null {
+  const layerSource = layer as ExplorerLayer & ImageSourceCarrier;
+  const frameSource = activeFrame as (ExplorerFrame & ImageSourceCarrier) | null;
+
+  return (
+    layerSource.imageUrl ??
+    layerSource.url ??
+    layerSource.src ??
+    frameSource?.imageUrl ??
+    frameSource?.url ??
+    frameSource?.src ??
+    null
+  );
 }
 
 export function ExplorerCanvas({
@@ -90,6 +114,8 @@ export function ExplorerCanvas({
         {visibleLayers.map((layer) => {
           const tintHex = getTintHex(layer.tint);
           const opacityValue = layer.opacity / EXPLORER_CONFIG.opacityMax;
+          const imageUrl = resolveLayerImageUrl(layer, activeFrame);
+
           return (
             <div
               key={layer.id}
@@ -99,9 +125,36 @@ export function ExplorerCanvas({
                 opacity: opacityValue,
                 mixBlendMode: mapBlendMode(layer.blendMode),
                 filter: buildFilterCss(layer),
-                background: `radial-gradient(circle at 48% 50%, ${tintHex}44 0%, ${tintHex}18 32%, transparent 68%)`,
               }}
-            />
+            >
+              {imageUrl ? (
+                <div className="relative h-full w-full">
+                  <img
+                    src={imageUrl}
+                    alt={`${layer.name ?? layer.id} astronomical cutout`}
+                    draggable={false}
+                    className="h-full w-full object-contain"
+                  />
+                  {/* Channel tint overlay preserving dark sky background */}
+                  <div
+                    aria-hidden="true"
+                    className="absolute inset-0"
+                    style={{
+                      backgroundColor: tintHex,
+                      mixBlendMode: "multiply",
+                    }}
+                  />
+                </div>
+              ) : (
+                <div
+                  aria-hidden="true"
+                  className="h-full w-full"
+                  style={{
+                    background: `radial-gradient(circle at 48% 50%, ${tintHex}44 0%, ${tintHex}18 32%, transparent 68%)`,
+                  }}
+                />
+              )}
+            </div>
           );
         })}
 

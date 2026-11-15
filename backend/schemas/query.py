@@ -22,6 +22,7 @@ class SkyImageQuery:
     ra_deg: float
     dec_deg: float
     observation_date: date
+    field_size_deg: float = 0.05
 
 
 def _required(args: Mapping[str, str], name: str) -> str:
@@ -39,13 +40,13 @@ def _parse_angle_deg(text: str, sexagesimal_unit: u.UnitBase, name: str) -> floa
             degrees = Angle(text, unit=sexagesimal_unit).degree
         except (ValueError, u.UnitsError):
             raise QueryValidationError(f"'{name}' is not a valid angle.") from None
+
     if not math.isfinite(degrees):
         raise QueryValidationError(f"'{name}' is not a valid angle.")
     return float(degrees)
 
 
 def parse_coordinates(args: Mapping[str, str]) -> Coordinates:
-    # Plain numbers are degrees; sexagesimal RA is hours (e.g. "05h 35m 17s").
     ra_deg = _parse_angle_deg(_required(args, "ra"), u.hourangle, "ra")
     dec_deg = _parse_angle_deg(_required(args, "dec"), u.deg, "dec")
 
@@ -57,9 +58,23 @@ def parse_coordinates(args: Mapping[str, str]) -> Coordinates:
     return Coordinates(ra_deg, dec_deg)
 
 
+def parse_field_size_deg(args: Mapping[str, str], default: float = 0.05) -> float:
+    raw = (args.get("fieldSizeDeg") or "").strip()
+    if not raw:
+        return default
+    cleaned = raw.removesuffix("deg").strip()
+    try:
+        size = float(cleaned)
+    except ValueError:
+        raise QueryValidationError("'fieldSizeDeg' must be a number in degrees.") from None
+
+    if not math.isfinite(size) or not (0.01 <= size <= 10.0):
+        raise QueryValidationError("'fieldSizeDeg' must be between 0.01 and 10 degrees.")
+    return size
+
+
 def parse_sky_image_query(args: Mapping[str, str]) -> SkyImageQuery:
     coords = parse_coordinates(args)
-
     try:
         observation_date = date.fromisoformat(_required(args, "observationDate"))
     except ValueError:
@@ -67,4 +82,5 @@ def parse_sky_image_query(args: Mapping[str, str]) -> SkyImageQuery:
             "'observationDate' must be a date in YYYY-MM-DD format."
         ) from None
 
-    return SkyImageQuery(coords.ra_deg, coords.dec_deg, observation_date)
+    field_size_deg = parse_field_size_deg(args)
+    return SkyImageQuery(coords.ra_deg, coords.dec_deg, observation_date, field_size_deg)
