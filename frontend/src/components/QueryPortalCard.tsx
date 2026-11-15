@@ -222,15 +222,14 @@ export function QueryPortalCard({
 
   return (
     <section className="w-full max-w-2xl">
+      <h1
+        id={headingId}
+        className="mb-4 text-center text-[length:var(--ae-text-2xl)] font-bold tracking-tight text-[var(--ae-text-primary)]"
+      >
+        {APP_CONFIG.name}
+      </h1>
       <div className="card border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-surface)] shadow-2xl">
-        <div className="card-body gap-5 p-6 sm:p-8">
-          <h1
-            id={headingId}
-            className="text-[length:var(--ae-text-2xl)] font-bold tracking-tight text-[var(--ae-text-primary)]"
-          >
-            {APP_CONFIG.name}
-          </h1>
-
+        <div className="card-body gap-4 p-5 sm:p-6">
           <form
             role="search"
             noValidate
