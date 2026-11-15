@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
+import { PORTAL_PLACEHOLDERS } from "../config/app";
 
 interface DocsModalProps {
   open: boolean;
@@ -60,8 +61,9 @@ export function DocsModal({ open, onClose }: DocsModalProps) {
             available frames in Explorer.
           </p>
           <div className="rounded-md border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-elevated)] p-3 font-mono text-[length:var(--ae-text-sm)]">
-            RA: 05h 35m 17s | Dec: -05° 23&apos; 28&quot; | Field: 0.5 deg |
-            Date: 2026-10-12
+            RA: {PORTAL_PLACEHOLDERS.ra} | Dec: {PORTAL_PLACEHOLDERS.dec} |
+            Field: {PORTAL_PLACEHOLDERS.fieldSizeDeg} | Date:{" "}
+            {PORTAL_PLACEHOLDERS.observationDate}
           </div>
         </div>
       </div>

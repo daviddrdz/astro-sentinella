@@ -1,4 +1,5 @@
 import { ArrowLeft } from "lucide-react";
+import { APP_CONFIG } from "../config/app";
 import type { QueryParams } from "../types/portal";
 import { formatFieldSizeDisplay } from "../utils/coordinates";
 
@@ -24,7 +25,7 @@ export function ExplorerPlaceholder({
             <span>Back</span>
           </button>
           <span className="text-[length:var(--ae-text-base)] font-semibold text-[var(--ae-text-primary)]">
-            Astro Earth
+            {APP_CONFIG.name}
           </span>
         </div>
 

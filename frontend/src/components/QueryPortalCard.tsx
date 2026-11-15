@@ -1,8 +1,10 @@
-import { useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { AlertCircle, Database, Layers } from "lucide-react";
-import type { QueryParams } from "../types/portal";
+import { APP_CONFIG, PORTAL_PLACEHOLDERS } from "../config/app";
+import { fetchCoordinateMetadata } from "../services/metadataService";
+import type { CoordinateMetadata, QueryParams } from "../types/portal";
 import {
-  lookupCoordinateMetadata,
+  hasValidCoordinates,
   validateQueryParams,
   type QueryFieldErrors,
 } from "../utils/coordinates";
@@ -12,7 +14,7 @@ interface QueryPortalCardProps {
   onSubmitQuery: (params: QueryParams) => void;
 }
 
-const DEFAULT_VALUES: QueryParams = {
+const EMPTY_VALUES: QueryParams = {
   ra: "",
   dec: "",
   fieldSizeDeg: "",
@@ -22,7 +24,7 @@ const DEFAULT_VALUES: QueryParams = {
 type TouchedFields = Partial<Record<keyof QueryParams, boolean>>;
 
 export function QueryPortalCard({
-  initialValues = DEFAULT_VALUES,
+  initialValues = EMPTY_VALUES,
   onSubmitQuery,
 }: QueryPortalCardProps) {
   const headingId = useId();
@@ -34,6 +36,10 @@ export function QueryPortalCard({
   const [values, setValues] = useState<QueryParams>(initialValues);
   const [touched, setTouched] = useState<TouchedFields>({});
   const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [fetchedMetadata, setFetchedMetadata] = useState<{
+    key: string;
+    data: CoordinateMetadata;
+  } | null>(null);
 
   const allErrors = useMemo(() => validateQueryParams(values), [values]);
 
@@ -47,10 +53,32 @@ export function QueryPortalCard({
     return visible;
   }, [allErrors, hasSubmitted, touched]);
 
-  const coordinateMetadata = useMemo(
-    () => lookupCoordinateMetadata(values.ra, values.dec),
-    [values.ra, values.dec]
-  );
+  const coordinatesReady = hasValidCoordinates(values.ra, values.dec);
+  const coordinateKey = coordinatesReady
+    ? `${values.ra.trim()}|${values.dec.trim()}`
+    : "";
+
+  useEffect(() => {
+    if (!coordinatesReady) {
+      return;
+    }
+
+    const controller = new AbortController();
+    fetchCoordinateMetadata(values.ra, values.dec, controller.signal).then(
+      (data) => {
+        if (!controller.signal.aborted && data) {
+          setFetchedMetadata({ key: coordinateKey, data });
+        }
+      }
+    );
+
+    return () => controller.abort();
+  }, [coordinatesReady, coordinateKey, values.ra, values.dec]);
+
+  const coordinateMetadata =
+    coordinatesReady && fetchedMetadata?.key === coordinateKey
+      ? fetchedMetadata.data
+      : null;
 
   const handleFieldChange = (field: keyof QueryParams, nextValue: string) => {
     setValues((prev) => ({ ...prev, [field]: nextValue }));
@@ -100,7 +128,7 @@ export function QueryPortalCard({
             id={headingId}
             className="text-[length:var(--ae-text-2xl)] font-bold tracking-tight text-[var(--ae-text-primary)]"
           >
-            Astro Earth
+            {APP_CONFIG.name}
           </h1>
 
           <form
@@ -127,7 +155,7 @@ export function QueryPortalCard({
                   autoCorrect="off"
                   autoCapitalize="none"
                   spellCheck={false}
-                  placeholder="05h 35m 17s"
+                  placeholder={PORTAL_PLACEHOLDERS.ra}
                   value={values.ra}
                   onChange={(e) => handleFieldChange("ra", e.target.value)}
                   onBlur={() => handleFieldBlur("ra")}
@@ -167,7 +195,7 @@ export function QueryPortalCard({
                   autoCorrect="off"
                   autoCapitalize="none"
                   spellCheck={false}
-                  placeholder={"-05° 23' 28\""}
+                  placeholder={PORTAL_PLACEHOLDERS.dec}
                   value={values.dec}
                   onChange={(e) => handleFieldChange("dec", e.target.value)}
                   onBlur={() => handleFieldBlur("dec")}
@@ -208,7 +236,7 @@ export function QueryPortalCard({
                   autoCorrect="off"
                   autoCapitalize="none"
                   spellCheck={false}
-                  placeholder="0.5 deg"
+                  placeholder={PORTAL_PLACEHOLDERS.fieldSizeDeg}
                   value={values.fieldSizeDeg}
                   onChange={(e) =>
                     handleFieldChange("fieldSizeDeg", e.target.value)
@@ -311,16 +339,24 @@ export function QueryPortalCard({
               </div>
 
               <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[length:var(--ae-text-sm)] text-[var(--ae-text-muted)]">
-                <span>{coordinateMetadata.instrument}</span>
-                <span aria-hidden="true">|</span>
+                {coordinateMetadata.instrument && (
+                  <>
+                    <span>{coordinateMetadata.instrument}</span>
+                    <span aria-hidden="true">|</span>
+                  </>
+                )}
                 <span className="flex items-center gap-1.5 font-mono text-[var(--ae-text-secondary)]">
                   <Layers className="h-4 w-4 shrink-0" aria-hidden="true" />
                   <span>{coordinateMetadata.availableBands.join(" | ")}</span>
                 </span>
-                <span aria-hidden="true">|</span>
-                <span className="font-mono">
-                  {coordinateMetadata.observationWindow}
-                </span>
+                {coordinateMetadata.observationWindow && (
+                  <>
+                    <span aria-hidden="true">|</span>
+                    <span className="font-mono">
+                      {coordinateMetadata.observationWindow}
+                    </span>
+                  </>
+                )}
               </div>
             </aside>
           )}

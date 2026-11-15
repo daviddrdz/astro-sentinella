@@ -1,4 +1,5 @@
-import type { CoordinateMetadata, QueryParams } from "../types/portal";
+import { COORDINATE_LIMITS, PORTAL_PLACEHOLDERS } from "../config/app";
+import type { QueryParams } from "../types/portal";
 
 const RA_HMS_PATTERN =
   /^\s*(?:[01]?\d|2[0-3])\s*(?:h|:|\s)\s*[0-5]?\d\s*(?:m|:|\s)\s*[0-5]?\d(?:\.\d+)?\s*s?\s*$/i;
@@ -8,90 +9,55 @@ const DECIMAL_NUMBER_PATTERN = /^\s*[+-]?\d+(?:\.\d+)?\s*$/;
 
 export type QueryFieldErrors = Partial<Record<keyof QueryParams, string>>;
 
-interface SeedEntry {
-  raKey: string;
-  decKey: string;
-  metadata: CoordinateMetadata;
-}
-
-function normalizeCoordinateKey(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[°'"hmsd:]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-const METADATA_CATALOG: SeedEntry[] = [
-  {
-    raKey: normalizeCoordinateKey("05h 35m 17s"),
-    decKey: normalizeCoordinateKey("-05° 23' 28\""),
-    metadata: {
-      targetName: "Orion Nebula",
-      catalogId: "M42",
-      instrument: "NIRCam / HST Composite",
-      availableBands: ["Ha", "OIII", "IR", "UV"],
-      frameCount: 12,
-      observationWindow: "2026-10-12 | 18:10Z to 20:00Z",
-    },
-  },
-  {
-    raKey: normalizeCoordinateKey("13h 29m 52s"),
-    decKey: normalizeCoordinateKey("+47° 11' 43\""),
-    metadata: {
-      targetName: "Whirlpool Galaxy",
-      catalogId: "M51",
-      instrument: "JWST / MIRI",
-      availableBands: ["IR", "BB", "Ha"],
-      frameCount: 8,
-      observationWindow: "2026-09-04 | 04:15Z to 05:30Z",
-    },
-  },
-];
-
 export function validateRa(value: string): string | undefined {
   const trimmed = value.trim();
   if (!trimmed) {
-    return "Enter Right Ascension (e.g. 05h 35m 17s).";
+    return `Enter Right Ascension (e.g. ${PORTAL_PLACEHOLDERS.ra}).`;
   }
   if (RA_HMS_PATTERN.test(trimmed)) {
     return undefined;
   }
   if (DECIMAL_NUMBER_PATTERN.test(trimmed)) {
     const deg = Number(trimmed);
-    if (deg >= 0 && deg < 360) {
+    if (deg >= COORDINATE_LIMITS.raMinDeg && deg < COORDINATE_LIMITS.raMaxDeg) {
       return undefined;
     }
   }
-  return "Use HMS format (05h 35m 17s) or degrees (0 to 360).";
+  return `Use HMS format (${PORTAL_PLACEHOLDERS.ra}) or degrees (${COORDINATE_LIMITS.raMinDeg} to ${COORDINATE_LIMITS.raMaxDeg}).`;
 }
 
 export function validateDec(value: string): string | undefined {
   const trimmed = value.trim();
   if (!trimmed) {
-    return "Enter Declination (e.g. -05° 23' 28\").";
+    return `Enter Declination (e.g. ${PORTAL_PLACEHOLDERS.dec}).`;
   }
   if (DEC_DMS_PATTERN.test(trimmed)) {
     return undefined;
   }
   if (DECIMAL_NUMBER_PATTERN.test(trimmed)) {
     const deg = Number(trimmed);
-    if (deg >= -90 && deg <= 90) {
+    if (
+      deg >= COORDINATE_LIMITS.decMinDeg &&
+      deg <= COORDINATE_LIMITS.decMaxDeg
+    ) {
       return undefined;
     }
   }
-  return "Use DMS format (-05° 23' 28\") or degrees (-90 to +90).";
+  return `Use DMS format (${PORTAL_PLACEHOLDERS.dec}) or degrees (${COORDINATE_LIMITS.decMinDeg} to +${COORDINATE_LIMITS.decMaxDeg}).`;
 }
 
 export function validateFieldSize(value: string): string | undefined {
   const cleaned = value.trim().replace(/\s*deg\s*$/i, "");
   if (!cleaned) {
-    return "Enter a field size in degrees (e.g. 0.5).";
+    return `Enter a field size in degrees (e.g. ${PORTAL_PLACEHOLDERS.fieldSizeDeg}).`;
   }
   const num = Number(cleaned);
-  if (!Number.isFinite(num) || num <= 0 || num > 10) {
-    return "Field size must be between 0.01 and 10 deg.";
+  if (
+    !Number.isFinite(num) ||
+    num < COORDINATE_LIMITS.fieldSizeMinDeg ||
+    num > COORDINATE_LIMITS.fieldSizeMaxDeg
+  ) {
+    return `Field size must be between ${COORDINATE_LIMITS.fieldSizeMinDeg} and ${COORDINATE_LIMITS.fieldSizeMaxDeg} deg.`;
   }
   return undefined;
 }
@@ -126,19 +92,8 @@ export function validateQueryParams(params: QueryParams): QueryFieldErrors {
   return errors;
 }
 
-export function lookupCoordinateMetadata(
-  ra: string,
-  dec: string
-): CoordinateMetadata | null {
-  if (validateRa(ra) || validateDec(dec)) {
-    return null;
-  }
-  const raKey = normalizeCoordinateKey(ra);
-  const decKey = normalizeCoordinateKey(dec);
-  const match = METADATA_CATALOG.find(
-    (entry) => entry.raKey === raKey && entry.decKey === decKey
-  );
-  return match ? match.metadata : null;
+export function hasValidCoordinates(ra: string, dec: string): boolean {
+  return !validateRa(ra) && !validateDec(dec);
 }
 
 export function formatFieldSizeDisplay(value: string): string {

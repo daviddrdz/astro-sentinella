@@ -1,4 +1,5 @@
 import { SiGithub } from "@icons-pack/react-simple-icons";
+import { APP_CONFIG } from "../config/app";
 
 interface PortalNavbarProps {
   onOpenDocs: () => void;
@@ -9,7 +10,7 @@ export function PortalNavbar({ onOpenDocs }: PortalNavbarProps) {
     <header className="navbar w-full border-b border-[var(--ae-border-subtle)] bg-[var(--ae-bg-surface)]/80 px-4 backdrop-blur-sm sm:px-6">
       <div className="flex-1">
         <span className="text-[length:var(--ae-text-base)] font-semibold tracking-tight text-[var(--ae-text-primary)]">
-          Astro Earth
+          {APP_CONFIG.name}
         </span>
       </div>
       <nav aria-label="Portal navigation" className="flex items-center gap-2">
@@ -21,7 +22,7 @@ export function PortalNavbar({ onOpenDocs }: PortalNavbarProps) {
           Docs
         </button>
         <a
-          href="https://github.com/daviddrdz/astro-sentinella"
+          href={APP_CONFIG.githubUrl}
           target="_blank"
           rel="noreferrer"
           aria-label="GitHub"
