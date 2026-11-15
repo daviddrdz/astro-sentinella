@@ -7,7 +7,13 @@ export type BlendMode = "Normal" | "Subtract" | "Screen" | "Add";
 
 export type BandChannelId = "Ha" | "OIII" | "IR" | "UV" | "BB";
 
-export type ChannelTintId = "Cyan" | "Amber" | "Violet" | "Emerald" | "White";
+export type ChannelTintId =
+  | "grey"
+  | "viridis"
+  | "magma"
+  | "inferno"
+  | "cividis"
+  | "cubehelix";
 
 export type LayerFilterId = "stretch" | "contrast" | "invert" | "edges";
 

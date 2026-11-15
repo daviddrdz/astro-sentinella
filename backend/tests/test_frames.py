@@ -7,6 +7,7 @@ from astropy.time import Time
 from app import app
 from schemas.query import QueryValidationError, parse_sky_image_query
 from services import frames_service, irsa_archive
+from services.image_renderer import render_image_png
 from services.frames_service import ImageNotFoundError, select_image_url_for_date
 from services.irsa_archive import ArchiveUnavailableError
 
@@ -106,9 +107,29 @@ def test_render_png_produces_png_bytes(monkeypatch, tmp_path):
 
     path = tmp_path / "img.fits"
     fits.HDUList([fits.PrimaryHDU(), fits.ImageHDU(np.random.rand(16, 16))]).writeto(path)
-    monkeypatch.setattr(frames_service, "FIGURE_DPI", 10)
 
     png = frames_service._render_png(str(path))
+    assert png.startswith(b"\x89PNG")
+
+
+def test_render_image_png_supports_multiple_bands():
+    import numpy as np
+    from astropy.wcs import WCS
+
+    def loader(source):
+        return np.arange(256, dtype=float).reshape(16, 16) + int(source), WCS()
+
+    png = render_image_png(
+        {
+            "sources": {1: "1", 2: "2"},
+            "ra": 133.795,
+            "dec": -7.2455,
+        },
+        bands=[1, 2],
+        target_px=100,
+        image_loader=loader,
+    )
+
     assert png.startswith(b"\x89PNG")
 
 
@@ -129,6 +150,6 @@ def test_image_download_retries_then_fails(monkeypatch):
         attempts.append(url)
         raise OSError("connection reset")
 
-    monkeypatch.setattr(frames_service, "_download_image_data", broken)
+    monkeypatch.setattr(frames_service, "_download_render_image", broken)
     with pytest.raises(ArchiveUnavailableError):
         frames_service._render_png("https://example/img.fits")

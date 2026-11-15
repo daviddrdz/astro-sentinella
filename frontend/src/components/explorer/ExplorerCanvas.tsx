@@ -31,7 +31,7 @@ type ImageSourceCarrier = {
 
 function getTintHex(tintId: ExplorerLayer["tint"]): string {
   const match = CHANNEL_TINTS.find((item) => item.id === tintId);
-  return match ? match.hex : "#4BA39B";
+  return match ? match.hex : "#808080";
 }
 
 function buildFilterCss(layer: ExplorerLayer): string {
@@ -223,7 +223,7 @@ export function ExplorerCanvas({
                     );
                   })()}
                   {/* Channel tint overlay preserving dark sky background */}
-                  {layer.tint !== "White" && (
+                  {layer.tint !== "grey" && (
                     <div
                       aria-hidden="true"
                       className="absolute inset-0"

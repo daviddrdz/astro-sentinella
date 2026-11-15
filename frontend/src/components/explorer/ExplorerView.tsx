@@ -231,7 +231,7 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
       blendMode: "Normal",
       opacity: EXPLORER_CONFIG.defaultNewLayerOpacity,
       visible: true,
-      tint: "Cyan",
+      tint: "viridis",
       filters: {
         stretch: false,
         contrast: false,
@@ -255,7 +255,7 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
       blendMode: "Normal",
       opacity: EXPLORER_CONFIG.opacityMax,
       visible: true,
-      tint: "White",
+      tint: "grey",
       filters: {
         stretch: false,
         contrast: false,

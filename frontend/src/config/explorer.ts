@@ -87,11 +87,12 @@ export interface ChannelTintOption {
 }
 
 export const CHANNEL_TINTS: readonly ChannelTintOption[] = [
-  { id: "Cyan", label: { en: "Cyan", es: "Cian" }, hex: "#4BA39B" },
-  { id: "Amber", label: { en: "Amber", es: "Ámbar" }, hex: "#FBBF24" },
-  { id: "Violet", label: { en: "Violet", es: "Violeta" }, hex: "#8B5CF6" },
-  { id: "Emerald", label: { en: "Emerald", es: "Esmeralda" }, hex: "#34D399" },
-  { id: "White", label: { en: "White", es: "Blanco" }, hex: "#E6ECF5" },
+  { id: "grey", label: { en: "grey", es: "grey" }, hex: "#808080" },
+  { id: "viridis", label: { en: "viridis", es: "viridis" }, hex: "#35B779" },
+  { id: "magma", label: { en: "magma", es: "magma" }, hex: "#B73779" },
+  { id: "inferno", label: { en: "inferno", es: "inferno" }, hex: "#F1602F" },
+  { id: "cividis", label: { en: "cividis", es: "cividis" }, hex: "#C8B84A" },
+  { id: "cubehelix", label: { en: "cubehelix", es: "cubehelix" }, hex: "#8C6BB1" },
 ];
 
 export interface LayerFilterOption {
@@ -222,7 +223,7 @@ export const DEFAULT_EXPLORER_LAYERS: readonly ExplorerLayer[] = [
     blendMode: "Normal",
     opacity: 100,
     visible: true,
-    tint: "White",
+    tint: "grey",
     filters: { stretch: false, contrast: false, invert: false, edges: false },
   },
   {
@@ -232,7 +233,7 @@ export const DEFAULT_EXPLORER_LAYERS: readonly ExplorerLayer[] = [
     blendMode: "Screen",
     opacity: 100,
     visible: false,
-    tint: "Emerald",
+    tint: "viridis",
     filters: { stretch: false, contrast: false, invert: false, edges: false },
   },
   {
@@ -242,7 +243,7 @@ export const DEFAULT_EXPLORER_LAYERS: readonly ExplorerLayer[] = [
     blendMode: "Normal",
     opacity: 70,
     visible: false,
-    tint: "Amber",
+    tint: "inferno",
     filters: { stretch: false, contrast: true, invert: false, edges: false },
   },
   {
@@ -252,7 +253,7 @@ export const DEFAULT_EXPLORER_LAYERS: readonly ExplorerLayer[] = [
     blendMode: "Normal",
     opacity: 0,
     visible: false,
-    tint: "Violet",
+    tint: "cubehelix",
     filters: { stretch: false, contrast: false, invert: false, edges: false },
   },
 ];
