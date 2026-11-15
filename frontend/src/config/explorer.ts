@@ -26,6 +26,11 @@ export const EXPLORER_CONFIG = {
   indexStep: 1,
   firstIndex: 0,
   maxUndoHistory: 30,
+  progressInitialPct: 15,
+  progressMaxPendingPct: 90,
+  progressStepPct: 12,
+  progressTickMs: 350,
+  progressCompletePct: 100,
   iconSizeSm: 14,
   iconSizeMd: 16,
   iconSizeLg: 18,
@@ -140,6 +145,9 @@ export const EXPLORER_COPY: Record<
     noLayers: string;
     toggleVisibility: string;
     close: string;
+    loadingFrame: string;
+    frameUnavailable: string;
+    retryFrame: string;
   }
 > = {
   en: {
@@ -168,6 +176,10 @@ export const EXPLORER_COPY: Record<
     noLayers: "No layers loaded.",
     toggleVisibility: "Toggle layer visibility",
     close: "Close",
+    loadingFrame: "Loading SPHEREx cutout...",
+    frameUnavailable:
+      "Frame unavailable or rate-limited. Wait a moment and retry.",
+    retryFrame: "Retry",
   },
   es: {
     backToPortal: "Volver al Portal",
@@ -195,6 +207,10 @@ export const EXPLORER_COPY: Record<
     noLayers: "No hay capas cargadas.",
     toggleVisibility: "Alternar visibilidad de capa",
     close: "Cerrar",
+    loadingFrame: "Cargando recorte SPHEREx...",
+    frameUnavailable:
+      "Fotograma no disponible o límite de peticiones alcanzado.",
+    retryFrame: "Reintentar",
   },
 };
 
@@ -203,11 +219,11 @@ export const DEFAULT_EXPLORER_LAYERS: readonly ExplorerLayer[] = [
     id: "frm-04",
     code: "FRM-04",
     band: "Ha",
-    blendMode: "Subtract",
-    opacity: 85,
+    blendMode: "Normal",
+    opacity: 100,
     visible: true,
-    tint: "Cyan",
-    filters: { stretch: true, contrast: false, invert: false, edges: false },
+    tint: "White",
+    filters: { stretch: false, contrast: false, invert: false, edges: false },
   },
   {
     id: "frm-03",
@@ -215,7 +231,7 @@ export const DEFAULT_EXPLORER_LAYERS: readonly ExplorerLayer[] = [
     band: "OIII",
     blendMode: "Screen",
     opacity: 100,
-    visible: true,
+    visible: false,
     tint: "Emerald",
     filters: { stretch: false, contrast: false, invert: false, edges: false },
   },
@@ -225,7 +241,7 @@ export const DEFAULT_EXPLORER_LAYERS: readonly ExplorerLayer[] = [
     band: "IR",
     blendMode: "Normal",
     opacity: 70,
-    visible: true,
+    visible: false,
     tint: "Amber",
     filters: { stretch: false, contrast: true, invert: false, edges: false },
   },

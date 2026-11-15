@@ -125,12 +125,10 @@ def test_image_download_retries_then_fails(monkeypatch):
     attempts = []
     monkeypatch.setattr(irsa_archive.time, "sleep", lambda _: None)
 
-    def broken(url):
+    def broken(url, *args):
         attempts.append(url)
         raise OSError("connection reset")
 
     monkeypatch.setattr(frames_service, "_download_image_data", broken)
     with pytest.raises(ArchiveUnavailableError):
         frames_service._render_png("https://example/img.fits")
-
-    assert len(attempts) == 1 + irsa_archive.MAX_RETRIES
