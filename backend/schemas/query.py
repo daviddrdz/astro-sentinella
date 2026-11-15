@@ -11,6 +11,9 @@ class QueryValidationError(ValueError):
     pass
 
 
+VALID_RENDER_COLORS = ("grey", "viridis", "magma", "inferno", "cividis", "cubehelix")
+
+
 @dataclass(frozen=True)
 class Coordinates:
     ra_deg: float
@@ -71,6 +74,14 @@ def parse_field_size_deg(args: Mapping[str, str], default: float = 0.05) -> floa
     if not math.isfinite(size) or not (0.01 <= size <= 10.0):
         raise QueryValidationError("'fieldSizeDeg' must be between 0.01 and 10 degrees.")
     return size
+
+
+def parse_render_color(args: Mapping[str, str], default: str = "magma") -> str:
+    color = (args.get("color") or "").strip() or default
+    if color not in VALID_RENDER_COLORS:
+        allowed = ", ".join(VALID_RENDER_COLORS)
+        raise QueryValidationError(f"'color' must be one of: {allowed}.")
+    return color
 
 
 def parse_sky_image_query(args: Mapping[str, str]) -> SkyImageQuery:

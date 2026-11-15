@@ -1,13 +1,12 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, Loader2, RotateCw } from "lucide-react";
 import {
-  CHANNEL_TINTS,
   EXPLORER_CONFIG,
   EXPLORER_COPY,
 } from "../../config/explorer";
 import type {
+  ChannelTintId,
   ExplorerFrame,
-  ExplorerLayer,
   ExplorerLocale,
   ExplorerToolId,
 } from "../../types/explorer";
@@ -15,11 +14,11 @@ import type { QueryParams } from "../../types/portal";
 
 interface ExplorerCanvasProps {
   query: QueryParams;
-  layers: ExplorerLayer[];
   activeFrame: ExplorerFrame | null;
   activeTool: ExplorerToolId;
   zoomLevel: number;
   locale: ExplorerLocale;
+  channelTint: ChannelTintId;
   onCanvasClick: () => void;
 }
 
@@ -29,73 +28,29 @@ type ImageSourceCarrier = {
   src?: string;
 };
 
-function getTintHex(tintId: ExplorerLayer["tint"]): string {
-  const match = CHANNEL_TINTS.find((item) => item.id === tintId);
-  return match ? match.hex : "#808080";
-}
-
-function buildFilterCss(layer: ExplorerLayer): string {
-  const parts: string[] = [];
-  if (layer.filters.stretch) {
-    parts.push("brightness(1.18)");
-  }
-  if (layer.filters.contrast) {
-    parts.push("contrast(1.35)");
-  }
-  if (layer.filters.invert) {
-    parts.push("invert(0.85)");
-  }
-  if (layer.filters.edges) {
-    parts.push("saturate(1.5) contrast(1.2)");
-  }
-  return parts.length > EXPLORER_CONFIG.firstIndex ? parts.join(" ") : "none";
-}
-
-function mapBlendMode(
-  blendMode: ExplorerLayer["blendMode"]
-): "normal" | "difference" | "screen" | "lighten" {
-  switch (blendMode) {
-    case "Subtract":
-      return "difference";
-    case "Screen":
-      return "screen";
-    case "Add":
-      return "lighten";
-    case "Normal":
-      return "normal";
-  }
-}
-
-function resolveLayerImageUrl(
-  layer: ExplorerLayer,
-  activeFrame: ExplorerFrame | null
+function resolveFrameImageUrl(
+  frame: ExplorerFrame | null,
+  channelTint: ChannelTintId
 ): string | null {
-  const layerSource = layer as ExplorerLayer & ImageSourceCarrier;
-  const frameSource = activeFrame as
-    (ExplorerFrame & ImageSourceCarrier) | null;
-
-  return (
-    layerSource.imageUrl ??
-    layerSource.url ??
-    layerSource.src ??
-    frameSource?.imageUrl ??
-    frameSource?.url ??
-    frameSource?.src ??
-    null
-  );
+  const frameSource = frame as (ExplorerFrame & ImageSourceCarrier) | null;
+  const imageUrl = frameSource?.imageUrl ?? frameSource?.url ?? frameSource?.src;
+  if (!imageUrl) {
+    return null;
+  }
+  const separator = imageUrl.includes("?") ? "&" : "?";
+  return `${imageUrl}${separator}color=${encodeURIComponent(channelTint)}`;
 }
 
 export function ExplorerCanvas({
   query,
-  layers,
   activeFrame,
   activeTool,
   zoomLevel,
   locale,
+  channelTint,
   onCanvasClick,
 }: ExplorerCanvasProps) {
   const copy = EXPLORER_COPY[locale];
-  const visibleLayers = layers.filter((layer) => layer.visible);
   const scaleArcmin = (EXPLORER_CONFIG.defaultScaleArcmin / zoomLevel).toFixed(
     EXPLORER_CONFIG.firstIndex
   );
@@ -110,7 +65,7 @@ export function ExplorerCanvas({
     EXPLORER_CONFIG.progressInitialPct
   );
 
-  const primaryUrl = activeFrame?.imageUrl ?? null;
+  const primaryUrl = resolveFrameImageUrl(activeFrame, channelTint);
   const primaryRetry = primaryUrl
     ? (retryCountByUrl[primaryUrl] ?? EXPLORER_CONFIG.firstIndex)
     : EXPLORER_CONFIG.firstIndex;
@@ -166,86 +121,53 @@ export function ExplorerCanvas({
         }}
       />
 
-      {/* Stacked photogram layers */}
+      {/* Rendered detector image */}
       <div
         className="relative h-[78%] w-[86%] max-w-3xl overflow-hidden rounded-lg border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-canvas)] shadow-2xl transition-transform duration-200"
         style={{ transform: `scale(${zoomLevel})` }}
       >
-        {visibleLayers.map((layer) => {
-          const tintHex = getTintHex(layer.tint);
-          const opacityValue = layer.opacity / EXPLORER_CONFIG.opacityMax;
-          const imageUrl = resolveLayerImageUrl(layer, activeFrame);
-
-          return (
-            <div
-              key={layer.id}
-              data-testid={`canvas-layer-${layer.id}`}
-              className="pointer-events-none absolute inset-0 transition-opacity duration-150"
-              style={{
-                opacity: opacityValue,
-                mixBlendMode: mapBlendMode(layer.blendMode),
-                filter: buildFilterCss(layer),
-              }}
-            >
-              {imageUrl ? (
-                <div className="relative h-full w-full">
-                  {(() => {
-                    const retryNum =
-                      retryCountByUrl[imageUrl] ?? EXPLORER_CONFIG.firstIndex;
-                    const cacheKey = `${imageUrl}#${retryNum}`;
-                    const imgStatus = statusByUrl[cacheKey] ?? "loading";
-                    const srcWithRetry =
-                      retryNum > EXPLORER_CONFIG.firstIndex
-                        ? `${imageUrl}&retry=${retryNum}`
-                        : imageUrl;
-                    return (
-                      <img
-                        key={cacheKey}
-                        src={srcWithRetry}
-                        alt={`${layer.code} astronomical cutout`}
-                        draggable={false}
-                        onLoad={() => {
-                          setStatusByUrl((prev) => ({
-                            ...prev,
-                            [cacheKey]: "loaded",
-                          }));
-                        }}
-                        onError={() => {
-                          setStatusByUrl((prev) => ({
-                            ...prev,
-                            [cacheKey]: "error",
-                          }));
-                        }}
-                        className={`h-full w-full object-contain transition-opacity duration-200 ${
-                          imgStatus === "loaded" ? "opacity-100" : "opacity-0"
-                        }`}
-                      />
-                    );
-                  })()}
-                  {/* Channel tint overlay preserving dark sky background */}
-                  {layer.tint !== "grey" && (
-                    <div
-                      aria-hidden="true"
-                      className="absolute inset-0"
-                      style={{
-                        backgroundColor: tintHex,
-                        mixBlendMode: "multiply",
-                      }}
-                    />
-                  )}
-                </div>
-              ) : (
-                <div
-                  aria-hidden="true"
-                  className="h-full w-full"
-                  style={{
-                    background: `radial-gradient(circle at 48% 50%, ${tintHex}44 0%, ${tintHex}18 32%, transparent 68%)`,
+        {primaryUrl ? (
+          <div className="relative h-full w-full">
+            {(() => {
+              const retryNum =
+                retryCountByUrl[primaryUrl] ?? EXPLORER_CONFIG.firstIndex;
+              const cacheKey = `${primaryUrl}#${retryNum}`;
+              const imgStatus = statusByUrl[cacheKey] ?? "loading";
+              const srcWithRetry =
+                retryNum > EXPLORER_CONFIG.firstIndex
+                  ? `${primaryUrl}&retry=${retryNum}`
+                  : primaryUrl;
+              return (
+                <img
+                  key={cacheKey}
+                  src={srcWithRetry}
+                  alt="Astronomical detector image"
+                  draggable={false}
+                  onLoad={() => {
+                    setStatusByUrl((prev) => ({
+                      ...prev,
+                      [cacheKey]: "loaded",
+                    }));
                   }}
+                  onError={() => {
+                    setStatusByUrl((prev) => ({
+                      ...prev,
+                      [cacheKey]: "error",
+                    }));
+                  }}
+                  className={`h-full w-full object-contain transition-opacity duration-200 ${
+                    imgStatus === "loaded" ? "opacity-100" : "opacity-0"
+                  }`}
                 />
-              )}
-            </div>
-          );
-        })}
+              );
+            })()}
+          </div>
+        ) : (
+          <div
+            aria-hidden="true"
+            className="h-full w-full bg-[var(--ae-bg-canvas)]"
+          />
+        )}
 
         {/* Loading skeleton or error fallback for remote cutouts */}
         {primaryUrl && primaryStatus === "loading" && (

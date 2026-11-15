@@ -7,13 +7,24 @@ import {
   SquareDashed,
   ZoomIn,
 } from "lucide-react";
-import { EXPLORER_CONFIG, EXPLORER_TOOLS } from "../../config/explorer";
-import type { ExplorerLocale, ExplorerToolId } from "../../types/explorer";
+import {
+  CHANNEL_TINTS,
+  EXPLORER_CONFIG,
+  EXPLORER_COPY,
+  EXPLORER_TOOLS,
+} from "../../config/explorer";
+import type {
+  ChannelTintId,
+  ExplorerLocale,
+  ExplorerToolId,
+} from "../../types/explorer";
 
 interface ExplorerToolbarProps {
   activeTool: ExplorerToolId;
   locale: ExplorerLocale;
   onSelectTool: (tool: ExplorerToolId) => void;
+  channelTint: ChannelTintId;
+  onChangeChannelTint: (tint: ChannelTintId) => void;
 }
 
 function ToolIcon({ id }: { id: ExplorerToolId }) {
@@ -40,8 +51,31 @@ export function ExplorerToolbar({
   activeTool,
   locale,
   onSelectTool,
+  channelTint,
+  onChangeChannelTint,
 }: ExplorerToolbarProps) {
   const mobileTools = EXPLORER_TOOLS.filter((tool) => tool.mobileVisible);
+  const copy = EXPLORER_COPY[locale];
+
+  const tintSelect = (
+    <label className="flex flex-col gap-1 text-[10px] font-medium text-[var(--ae-text-muted)]">
+      <span>{copy.channelTint}</span>
+      <select
+        aria-label={copy.channelTint}
+        value={channelTint}
+        onChange={(event) =>
+          onChangeChannelTint(event.target.value as ChannelTintId)
+        }
+        className="select select-bordered select-xs w-28 bg-[var(--ae-bg-base)] px-1 text-[10px] text-[var(--ae-text-primary)]"
+      >
+        {CHANNEL_TINTS.map((tint) => (
+          <option key={tint.id} value={tint.id}>
+            {tint.label[locale]}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
 
   return (
     <>
@@ -71,6 +105,7 @@ export function ExplorerToolbar({
             </button>
           );
         })}
+        {tintSelect}
       </aside>
 
       {/* Mobile compact tool dock */}
@@ -99,6 +134,7 @@ export function ExplorerToolbar({
             </button>
           );
         })}
+        {tintSelect}
       </nav>
     </>
   );

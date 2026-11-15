@@ -15,7 +15,7 @@ describe("ExplorerView", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders navbar summary, tools, layers inspector, and timeline", () => {
+  it("renders navbar summary, tint controls, and timeline", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(null, { status: 404 })
     );
@@ -25,42 +25,23 @@ describe("ExplorerView", () => {
     expect(
       screen.getByText("05h 35m 17s | -05° 23' 28\" | 30 arcmin | 2026-10-12")
     ).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Layers" })).toBeInTheDocument();
-    expect(screen.getByText("FRM-04 | Ha")).toBeInTheDocument();
+    expect(screen.queryByText("FRM-04 | Band 1")).not.toBeInTheDocument();
+    expect(screen.getAllByLabelText("Channel Tint")[0]).toHaveValue("magma");
     const timeline = screen.getByRole("region", { name: "Timeline" });
     expect(timeline).toBeInTheDocument();
-    expect(within(timeline).getByText("18:40Z | Ha")).toBeInTheDocument();
+    expect(within(timeline).getByText("18:40Z | Band 4")).toBeInTheDocument();
   });
 
-  it("supports layer visibility toggle, undo/redo, and adding a layer", () => {
+  it("changes the backend render tint from the toolbar", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(null, { status: 404 })
     );
 
     render(<ExplorerView query={SAMPLE_QUERY} onBackToPortal={vi.fn()} />);
 
-    const [undoBtn] = screen.getAllByRole("button", { name: "Undo" });
-    const [redoBtn] = screen.getAllByRole("button", { name: "Redo" });
-    expect(undoBtn).toBeDisabled();
-    expect(redoBtn).toBeDisabled();
-
-    const toggleBtn = screen.getByRole("button", {
-      name: "Toggle layer visibility FRM-04",
-    });
-    expect(toggleBtn).toHaveAttribute("aria-pressed", "true");
-    fireEvent.click(toggleBtn);
-    expect(toggleBtn).toHaveAttribute("aria-pressed", "false");
-    expect(undoBtn).toBeEnabled();
-
-    fireEvent.click(undoBtn);
-    expect(toggleBtn).toHaveAttribute("aria-pressed", "true");
-    expect(redoBtn).toBeEnabled();
-
-    fireEvent.click(redoBtn);
-    expect(toggleBtn).toHaveAttribute("aria-pressed", "false");
-
-    fireEvent.click(screen.getByRole("button", { name: "Add" }));
-    expect(screen.getByText("FRM-05 | Ha")).toBeInTheDocument();
+    const tintSelect = screen.getAllByLabelText("Channel Tint")[0];
+    fireEvent.change(tintSelect, { target: { value: "inferno" } });
+    expect(tintSelect).toHaveValue("inferno");
   });
 
   it("filters timeline frames by tab and band, and steps playback", () => {
@@ -73,17 +54,17 @@ describe("ExplorerView", () => {
     const timeline = screen.getByRole("region", { name: "Timeline" });
 
     fireEvent.click(within(timeline).getByRole("tab", { name: "Filtered" }));
-    expect(within(timeline).getByText("18:50Z | Ha")).toBeInTheDocument();
-    expect(within(timeline).queryByText("18:10Z | UV")).not.toBeInTheDocument();
+    expect(within(timeline).getByText("18:50Z | Band 5")).toBeInTheDocument();
+    expect(within(timeline).queryByText("18:10Z | Band 1")).not.toBeInTheDocument();
 
     fireEvent.click(within(timeline).getByRole("tab", { name: "All" }));
-    fireEvent.change(within(timeline).getByLabelText("Band: All"), {
-      target: { value: "OIII" },
+    fireEvent.change(within(timeline).getByLabelText("Detectors: All"), {
+      target: { value: "Band 3" },
     });
-    expect(within(timeline).getByText("18:30Z | OIII")).toBeInTheDocument();
-    expect(within(timeline).queryByText("18:40Z | Ha")).not.toBeInTheDocument();
+    expect(within(timeline).getByText("18:30Z | Band 3")).toBeInTheDocument();
+    expect(within(timeline).queryByText("18:40Z | Band 4")).not.toBeInTheDocument();
 
-    fireEvent.change(within(timeline).getByLabelText("Band: All"), {
+    fireEvent.change(within(timeline).getByLabelText("Detectors: All"), {
       target: { value: "all" },
     });
     fireEvent.click(
@@ -100,7 +81,7 @@ describe("ExplorerView", () => {
     render(<ExplorerView query={SAMPLE_QUERY} onBackToPortal={vi.fn()} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Toggle language" }));
-    expect(screen.getByRole("heading", { name: "Capas" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Detectores: Todos")).toBeInTheDocument();
     expect(screen.getByText("Línea de tiempo")).toBeInTheDocument();
   });
 });

@@ -12,6 +12,7 @@ from services.irsa_archive import ArchiveUnavailableError, search_images
 conf.remote_timeout = 120
 
 PNG_CACHE = TTLCache(ttl_s=3600, max_items=32)
+FITS_CACHE = TTLCache(ttl_s=3600, max_items=32)
 
 
 class ImageNotFoundError(Exception):
@@ -78,14 +79,20 @@ def _find_image_url(ra_deg: float, dec_deg: float, observation_date: date) -> st
 
 
 def _render_png(
-    fits_url: str, ra_deg: float = 0.0, dec_deg: float = 0.0, size_deg: float = 0.05
+    fits_url: str,
+    ra_deg: float = 0.0,
+    dec_deg: float = 0.0,
+    size_deg: float = 0.05,
+    color: str = "magma",
 ) -> bytes:
     try:
         return render_image_png(
             {"source": fits_url, "ra": ra_deg, "dec": dec_deg},
             size=None,
-            image_loader=lambda source: _download_render_image(
-                source, ra_deg, dec_deg, size_deg
+            color=color,
+            image_loader=lambda source: FITS_CACHE.get_or_compute(
+                (source, round(ra_deg, 5), round(dec_deg, 5), size_deg),
+                lambda: _download_render_image(source, ra_deg, dec_deg, size_deg),
             ),
         )
     except OSError as exc:
@@ -96,11 +103,13 @@ def _download_render_image(fits_url, ra_deg, dec_deg, size_deg):
     return _download_fits_image(fits_url, ra_deg, dec_deg, size_deg)
 
 
-def get_sky_image_png(ra_deg, dec_deg, observation_date, size_deg=0.05) -> bytes:
-    key = (round(ra_deg, 5), round(dec_deg, 5), observation_date, size_deg)
+def get_sky_image_png(
+    ra_deg, dec_deg, observation_date, size_deg=0.05, color="magma"
+) -> bytes:
+    key = (round(ra_deg, 5), round(dec_deg, 5), observation_date, size_deg, color)
 
     def compute():
         fits_url = _find_image_url(ra_deg, dec_deg, observation_date)
-        return _render_png(fits_url, ra_deg, dec_deg, size_deg)
+        return _render_png(fits_url, ra_deg, dec_deg, size_deg, color)
 
     return PNG_CACHE.get_or_compute(key, compute)
