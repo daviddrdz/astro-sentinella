@@ -1,0 +1,49 @@
+@import "tailwindcss";
+@import "./styles/tokens.css";
+
+@plugin "daisyui" {
+  themes: astro-dark --default;
+}
+
+@plugin "daisyui/theme" {
+  name: "astro-dark";
+  default: true;
+  prefersdark: true;
+  color-scheme: dark;
+
+  --color-base-100: var(--ae-bg-surface);
+  --color-base-200: var(--ae-bg-canvas);
+  --color-base-300: var(--ae-bg-elevated);
+  --color-base-content: var(--ae-text-primary);
+
+  --color-primary: var(--ae-accent-primary);
+  --color-primary-content: var(--ae-accent-primary-content);
+  --color-secondary: var(--ae-accent-cyan);
+  --color-secondary-content: var(--ae-accent-cyan-content);
+  --color-accent: var(--ae-accent-cyan);
+  --color-accent-content: var(--ae-accent-cyan-content);
+
+  --color-neutral: var(--ae-bg-elevated);
+  --color-neutral-content: var(--ae-text-primary);
+
+  --color-info: var(--ae-status-info);
+  --color-success: var(--ae-status-success);
+  --color-warning: var(--ae-status-warning);
+  --color-error: var(--ae-status-error);
+
+  --radius-selector: var(--ae-radius-sm);
+  --radius-field: var(--ae-radius-md);
+  --radius-box: var(--ae-radius-lg);
+}
+
+@layer base {
+  html,
+  body {
+    background-color: var(--ae-bg-canvas);
+    color: var(--ae-text-primary);
+    font-family: var(--ae-font-sans);
+    font-size: var(--ae-text-base);
+    min-height: 100%;
+  }
+}
+
