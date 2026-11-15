@@ -5,15 +5,12 @@ import {
   CHANNEL_TINTS,
   EXPLORER_CONFIG,
   EXPLORER_COPY,
-  LAYER_FILTERS,
 } from "../../config/explorer";
 import type {
-  BandChannelId,
   BlendMode,
   ChannelTintId,
   ExplorerLayer,
   ExplorerLocale,
-  LayerFilterId,
 } from "../../types/explorer";
 
 interface LayersInspectorProps {
@@ -24,7 +21,6 @@ interface LayersInspectorProps {
   onToggleLayerVisibility: (id: string) => void;
   onAddLayer: () => void;
   onUpdateLayer: (id: string, patch: Partial<ExplorerLayer>) => void;
-  onToggleLayerFilter: (id: string, filterId: LayerFilterId) => void;
   onMergeVisible: () => void;
 }
 
@@ -36,7 +32,6 @@ export function LayersInspector({
   onToggleLayerVisibility,
   onAddLayer,
   onUpdateLayer,
-  onToggleLayerFilter,
   onMergeVisible,
 }: LayersInspectorProps) {
   const copy = EXPLORER_COPY[locale];
@@ -153,22 +148,39 @@ export function LayersInspector({
               <span className="mb-1 block text-sm font-medium text-[var(--ae-text-muted)]">
                 {copy.bandChannel}
               </span>
-              <select
+              <div
+                role="group"
                 aria-label={copy.bandChannel}
-                value={activeLayer.band}
-                onChange={(event) =>
-                  onUpdateLayer(activeLayer.id, {
-                    band: event.target.value as BandChannelId,
-                  })
-                }
-                className="select select-bordered select-sm ae-field-input w-full bg-[var(--ae-bg-base)] text-sm text-[var(--ae-text-primary)]"
+                className="grid gap-1.5"
               >
                 {BAND_CHANNELS.map((channel) => (
-                  <option key={channel.id} value={channel.id}>
-                    {channel.label}
-                  </option>
+                  <label
+                    key={channel.id}
+                    className="flex cursor-pointer items-start gap-2 rounded border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-base)] px-2 py-1.5 text-sm text-[var(--ae-text-primary)]"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={activeLayer.bands.includes(channel.id)}
+                      onChange={() => {
+                        const bands = activeLayer.bands.includes(channel.id)
+                          ? activeLayer.bands.filter((band) => band !== channel.id)
+                          : [...activeLayer.bands, channel.id].sort(
+                              (a, b) => a - b
+                            );
+                        if (bands.length === 0) {
+                          return;
+                        }
+                        onUpdateLayer(activeLayer.id, {
+                          bands,
+                          band: bands[0],
+                        });
+                      }}
+                      className="checkbox checkbox-primary checkbox-xs mt-0.5"
+                    />
+                    <span>{channel.label}</span>
+                  </label>
                 ))}
-              </select>
+              </div>
             </label>
 
             <label className="block">
@@ -187,7 +199,7 @@ export function LayersInspector({
               >
                 {CHANNEL_TINTS.map((tint) => (
                   <option key={tint.id} value={tint.id}>
-                    {tint.label[locale]}
+                    {tint.label}
                   </option>
                 ))}
               </select>
@@ -215,34 +227,6 @@ export function LayersInspector({
                 className="range range-primary range-xs w-full"
               />
             </label>
-
-            <div>
-              <span className="mb-1.5 block text-sm font-medium text-[var(--ae-text-muted)]">
-                {copy.filters}
-              </span>
-              <div className="grid grid-cols-2 gap-1.5">
-                {LAYER_FILTERS.map((filter) => {
-                  const enabled = activeLayer.filters[filter.id];
-                  return (
-                    <button
-                      key={filter.id}
-                      type="button"
-                      onClick={() =>
-                        onToggleLayerFilter(activeLayer.id, filter.id)
-                      }
-                      aria-pressed={enabled}
-                      className={`btn btn-xs h-8 border text-sm font-medium ${
-                        enabled
-                          ? "border-[var(--ae-primary)] bg-[var(--ae-primary)]/15 text-[var(--ae-primary)]"
-                          : "border-[var(--ae-border-subtle)] bg-[var(--ae-bg-base)] text-[var(--ae-text-muted)] hover:text-[var(--ae-text-primary)]"
-                      }`}
-                    >
-                      {filter.label[locale]}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
 
             <button
               type="button"

@@ -5,11 +5,15 @@ export type ExplorerToolId =
 
 export type BlendMode = "Normal" | "Subtract" | "Screen" | "Add";
 
-export type BandChannelId = "Ha" | "OIII" | "IR" | "UV" | "BB";
+export type BandChannelId = 1 | 2 | 3 | 4 | 5 | 6;
 
-export type ChannelTintId = "Cyan" | "Amber" | "Violet" | "Emerald" | "White";
-
-export type LayerFilterId = "stretch" | "contrast" | "invert" | "edges";
+export type ChannelTintId =
+  | "grey"
+  | "viridis"
+  | "magma"
+  | "inferno"
+  | "cividis"
+  | "cubehelix";
 
 export type TimelineFilterTab = "all" | "visible" | "filtered";
 
@@ -17,11 +21,11 @@ export interface ExplorerLayer {
   id: string;
   code: string;
   band: BandChannelId;
+  bands: BandChannelId[];
   blendMode: BlendMode;
   opacity: number;
   visible: boolean;
   tint: ChannelTintId;
-  filters: Record<LayerFilterId, boolean>;
 }
 
 export interface ExplorerFrame {

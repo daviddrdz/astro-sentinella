@@ -3,7 +3,6 @@ import { EXPLORER_CONFIG, EXPLORER_COPY } from "../../config/explorer";
 import type {
   ExplorerLayer,
   ExplorerLocale,
-  LayerFilterId,
 } from "../../types/explorer";
 import { LayersInspector } from "./LayersInspector";
 
@@ -17,7 +16,6 @@ interface MobileLayersDrawerProps {
   onToggleLayerVisibility: (id: string) => void;
   onAddLayer: () => void;
   onUpdateLayer: (id: string, patch: Partial<ExplorerLayer>) => void;
-  onToggleLayerFilter: (id: string, filterId: LayerFilterId) => void;
   onMergeVisible: () => void;
 }
 
@@ -31,7 +29,6 @@ export function MobileLayersDrawer({
   onToggleLayerVisibility,
   onAddLayer,
   onUpdateLayer,
-  onToggleLayerFilter,
   onMergeVisible,
 }: MobileLayersDrawerProps) {
   if (!open) {
@@ -73,7 +70,6 @@ export function MobileLayersDrawer({
             onToggleLayerVisibility={onToggleLayerVisibility}
             onAddLayer={onAddLayer}
             onUpdateLayer={onUpdateLayer}
-            onToggleLayerFilter={onToggleLayerFilter}
             onMergeVisible={onMergeVisible}
           />
         </div>

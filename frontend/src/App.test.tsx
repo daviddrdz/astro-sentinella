@@ -7,11 +7,16 @@ import {
   within,
 } from "@testing-library/react";
 import App from "./App";
-import { APP_CONFIG, PORTAL_PLACEHOLDERS } from "./config/app";
+import {
+  APP_CONFIG,
+  PORTAL_FEATURED_SECTORS,
+  PORTAL_PLACEHOLDERS,
+} from "./config/app";
 
 describe("Astro Sentinella Portal", () => {
   afterEach(() => {
     window.localStorage.clear();
+    window.history.replaceState(null, "", "/");
     vi.restoreAllMocks();
   });
 
@@ -264,5 +269,34 @@ describe("Astro Sentinella Portal", () => {
     expect(raInput).toHaveValue(PORTAL_PLACEHOLDERS.ra);
     expect(screen.getByLabelText("Dec")).toHaveValue(PORTAL_PLACEHOLDERS.dec);
     expect(screen.getByLabelText("Field Size (deg)")).toHaveValue("0.5");
+  });
+
+  it("populates coordinates when selecting a SPHEREx target sector", () => {
+    const targetSector = PORTAL_FEATURED_SECTORS[0];
+    render(<App />);
+
+    const sectorSection = screen.getByRole("region", {
+      name: "SPHEREx target sectors",
+    });
+    const sectorButton = within(sectorSection).getByRole("button", {
+      name: new RegExp(targetSector.name, "i"),
+    });
+    fireEvent.click(sectorButton);
+
+    expect(screen.getByLabelText("RA")).toHaveValue(targetSector.ra);
+    expect(screen.getByLabelText("Dec")).toHaveValue(targetSector.dec);
+    expect(screen.getByLabelText("Field Size (deg)")).toHaveValue(
+      targetSector.fieldSizeDeg
+    );
+  });
+
+  it("initializes portal fields from URL query parameters (?ra, ?dec, ?fov)", () => {
+    window.history.replaceState(null, "", "/?ra=335.23059&dec=-36.47150&fov=4");
+
+    render(<App />);
+
+    expect(screen.getByLabelText("RA")).toHaveValue("335.23059");
+    expect(screen.getByLabelText("Dec")).toHaveValue("-36.47150");
+    expect(screen.getByLabelText("Field Size (deg)")).toHaveValue("4");
   });
 });

@@ -1,16 +1,18 @@
 import logging
 import time
 from collections.abc import Callable
+from services.cache import TTLCache
 from typing import TypeVar
 
 from astropy.table import Table
 from pyvo.dal import DALQueryError, DALServiceError, SIA2Service
 
-SIA_URL = "https://irsa.ipac.caltech.edu/SIA"
+SIA_URL = "https://irsa.ipac.caltech.edu/SIA?"
 COLLECTION = "spherex_dr1"
 SEARCH_RADIUS_DEG = 0.01
 MAX_RETRIES = 3
 RETRY_BACKOFF_S = 1.0
+SEARCH_CACHE = TTLCache(ttl_s=600, max_items=64)
 
 logger = logging.getLogger(__name__)
 T = TypeVar("T")
@@ -49,11 +51,14 @@ def _query_images(ra_deg: float, dec_deg: float) -> Table:
 
 
 def search_images(ra_deg: float, dec_deg: float) -> Table:
-    try:
-        return with_retries(
-            lambda: _query_images(ra_deg, dec_deg),
-            (DALServiceError,),
-            "Image archive query",
-        )
-    except (DALServiceError, DALQueryError) as exc:
-        raise ArchiveUnavailableError("Image archive query failed.") from exc
+    def compute():
+        try:
+            return with_retries(
+                lambda: _query_images(ra_deg, dec_deg),
+                (DALServiceError,),
+                "Image archive query",
+            )
+        except (DALServiceError, DALQueryError) as exc:
+            raise ArchiveUnavailableError("Image archive query failed.") from exc
+
+    return SEARCH_CACHE.get_or_compute((round(ra_deg, 4), round(dec_deg, 4)), compute)

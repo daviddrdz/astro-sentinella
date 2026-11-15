@@ -6,6 +6,8 @@ from datetime import date
 import astropy.units as u
 from astropy.coordinates import Angle
 
+VALID_RENDER_COLORS = ("grey", "viridis", "magma", "inferno", "cividis", "cubehelix")
+VALID_RENDER_BANDS = tuple(range(1, 7))
 
 class QueryValidationError(ValueError):
     pass
@@ -22,6 +24,9 @@ class SkyImageQuery:
     ra_deg: float
     dec_deg: float
     observation_date: date
+    field_size_deg: float = 0.05
+    color: str = "magma"
+    bands: tuple[int, ...] = ()
 
 
 def _required(args: Mapping[str, str], name: str) -> str:
@@ -39,13 +44,13 @@ def _parse_angle_deg(text: str, sexagesimal_unit: u.UnitBase, name: str) -> floa
             degrees = Angle(text, unit=sexagesimal_unit).degree
         except (ValueError, u.UnitsError):
             raise QueryValidationError(f"'{name}' is not a valid angle.") from None
+
     if not math.isfinite(degrees):
         raise QueryValidationError(f"'{name}' is not a valid angle.")
     return float(degrees)
 
 
 def parse_coordinates(args: Mapping[str, str]) -> Coordinates:
-    # Plain numbers are degrees; sexagesimal RA is hours (e.g. "05h 35m 17s").
     ra_deg = _parse_angle_deg(_required(args, "ra"), u.hourangle, "ra")
     dec_deg = _parse_angle_deg(_required(args, "dec"), u.deg, "dec")
 
@@ -57,9 +62,23 @@ def parse_coordinates(args: Mapping[str, str]) -> Coordinates:
     return Coordinates(ra_deg, dec_deg)
 
 
+def parse_field_size_deg(args: Mapping[str, str], default: float = 0.05) -> float:
+    raw = (args.get("fieldSizeDeg") or "").strip()
+    if not raw:
+        return default
+    cleaned = raw.removesuffix("deg").strip()
+    try:
+        size = float(cleaned)
+    except ValueError:
+        raise QueryValidationError("'fieldSizeDeg' must be a number in degrees.") from None
+
+    if not math.isfinite(size) or not (0.01 <= size <= 10.0):
+        raise QueryValidationError("'fieldSizeDeg' must be between 0.01 and 10 degrees.")
+    return size
+
+
 def parse_sky_image_query(args: Mapping[str, str]) -> SkyImageQuery:
     coords = parse_coordinates(args)
-
     try:
         observation_date = date.fromisoformat(_required(args, "observationDate"))
     except ValueError:
@@ -67,4 +86,31 @@ def parse_sky_image_query(args: Mapping[str, str]) -> SkyImageQuery:
             "'observationDate' must be a date in YYYY-MM-DD format."
         ) from None
 
-    return SkyImageQuery(coords.ra_deg, coords.dec_deg, observation_date)
+    field_size_deg = parse_field_size_deg(args)
+    color = (args.get("color") or "magma").strip()
+    if color not in VALID_RENDER_COLORS:
+        raise QueryValidationError(
+            f"'color' must be one of: {', '.join(VALID_RENDER_COLORS)}."
+        )
+
+    raw_bands = (args.get("bands") or "").strip()
+    if raw_bands:
+        try:
+            bands = tuple(int(value.strip()) for value in raw_bands.split(","))
+        except ValueError:
+            raise QueryValidationError("'bands' must be a comma-separated list of integers.") from None
+        if not bands or any(band not in VALID_RENDER_BANDS for band in bands):
+            raise QueryValidationError("'bands' must contain values from 1 to 6.")
+        if len(set(bands)) != len(bands):
+            raise QueryValidationError("'bands' must not contain duplicate values.")
+    else:
+        bands = ()
+
+    return SkyImageQuery(
+        coords.ra_deg,
+        coords.dec_deg,
+        observation_date,
+        field_size_deg,
+        color,
+        bands,
+    )
