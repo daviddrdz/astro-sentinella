@@ -1,10 +1,17 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import App from "./App";
 import { APP_CONFIG, PORTAL_PLACEHOLDERS } from "./config/app";
 
-describe("Astro Earth Portal", () => {
+describe("Astro Sentinella Portal", () => {
   afterEach(() => {
+    window.localStorage.clear();
     vi.restoreAllMocks();
   });
 
@@ -32,10 +39,8 @@ describe("Astro Earth Portal", () => {
       "aria-invalid",
       "false"
     );
-    const dateSelect = screen.getByLabelText("Observation Date");
-    expect(dateSelect).toHaveAttribute("aria-invalid", "false");
-    expect(dateSelect).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Query" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Observation Date")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Explore" })).toBeInTheDocument();
   });
 
   it("fetches metadata and populates Observation Date options from coordinates without clicking Query", async () => {
@@ -82,7 +87,7 @@ describe("Astro Earth Portal", () => {
     ).toBeInTheDocument();
   });
 
-  it("hides metadata panel and keeps date dropdown disabled when no metadata is available", async () => {
+  it("hides metadata panel, falls back to default Observation Date, and continues query when no metadata is available", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: false,
       status: 404,
@@ -103,13 +108,22 @@ describe("Astro Earth Portal", () => {
     expect(
       screen.queryByLabelText("Available coordinate metadata")
     ).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Observation Date")).toBeDisabled();
+
+    const dateSelect = screen.getByLabelText("Observation Date");
+    expect(dateSelect).toHaveValue(PORTAL_PLACEHOLDERS.observationDate);
+
+    fireEvent.change(screen.getByLabelText("Field Size (deg)"), {
+      target: { value: "0.5" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Explore" }));
+
+    expect(screen.getByRole("heading", { name: "Layers" })).toBeInTheDocument();
   });
 
   it("validates fields on submit and focuses the first invalid input", () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Query" }));
+    fireEvent.click(screen.getByRole("button", { name: "Explore" }));
 
     const raInput = screen.getByLabelText("RA");
     expect(raInput).toHaveAttribute("aria-invalid", "true");
@@ -151,19 +165,17 @@ describe("Astro Earth Portal", () => {
       target: { value: PORTAL_PLACEHOLDERS.observationDate },
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Query" }));
+    fireEvent.click(screen.getByRole("button", { name: "Explore" }));
 
+    expect(screen.getByRole("heading", { name: "Layers" })).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "Explorer" })
+      screen.getByText(
+        `${PORTAL_PLACEHOLDERS.ra} | ${PORTAL_PLACEHOLDERS.dec} | 30 arcmin | ${PORTAL_PLACEHOLDERS.observationDate}`
+      )
     ).toBeInTheDocument();
-    expect(
-      screen.getAllByText(
-        `${PORTAL_PLACEHOLDERS.ra} | ${PORTAL_PLACEHOLDERS.dec} | 0.5 deg | ${PORTAL_PLACEHOLDERS.observationDate}`
-      ).length
-    ).toBeGreaterThan(0);
 
-    fireEvent.click(screen.getByRole("button", { name: "Back" }));
-    expect(screen.getByRole("button", { name: "Query" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Back to Portal" }));
+    expect(screen.getByRole("button", { name: "Explore" })).toBeInTheDocument();
   });
 
   it("opens documentation dialog from navbar", () => {
@@ -172,5 +184,80 @@ describe("Astro Earth Portal", () => {
     expect(
       screen.getByRole("heading", { name: "Documentation" })
     ).toBeInTheDocument();
+  });
+
+  it("saves submitted coordinates to browser history without rendering a bottom list, and caps autocomplete to 10 best matches", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(null, { status: 404 })
+    );
+
+    const entries = Array.from({ length: 12 }, (_, idx) => ({
+      ra: `05h 35m ${String(10 + idx).padStart(2, "0")}s`,
+      dec: PORTAL_PLACEHOLDERS.dec,
+      fieldSizeDeg: "0.5",
+      observationDate: PORTAL_PLACEHOLDERS.observationDate,
+    }));
+    window.localStorage.setItem(
+      "astro-sentinella.portal-history.v1",
+      JSON.stringify(entries)
+    );
+
+    render(<App />);
+
+    expect(
+      screen.queryByRole("region", { name: "Recent coordinate queries" })
+    ).not.toBeInTheDocument();
+
+    const raInput = screen.getByLabelText("RA");
+    fireEvent.focus(raInput);
+    fireEvent.change(raInput, { target: { value: "05h 35m" } });
+
+    const listbox = screen.getByRole("listbox", {
+      name: "RA autocomplete suggestions",
+    });
+    expect(within(listbox).getAllByRole("option")).toHaveLength(10);
+  });
+
+  it("ignores invalid entries in history and provides RA autocomplete suggestions", async () => {
+    window.localStorage.setItem(
+      "astro-sentinella.portal-history.v1",
+      JSON.stringify([
+        {
+          ra: "invalid-ra",
+          dec: "invalid-dec",
+          fieldSizeDeg: "999",
+          observationDate: "",
+        },
+        {
+          ra: PORTAL_PLACEHOLDERS.ra,
+          dec: PORTAL_PLACEHOLDERS.dec,
+          fieldSizeDeg: "0.5",
+          observationDate: PORTAL_PLACEHOLDERS.observationDate,
+        },
+      ])
+    );
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(null, { status: 404 })
+    );
+
+    render(<App />);
+
+    const raInput = screen.getByLabelText("RA");
+    fireEvent.focus(raInput);
+    fireEvent.change(raInput, { target: { value: "05h" } });
+
+    const listbox = screen.getByRole("listbox", {
+      name: "RA autocomplete suggestions",
+    });
+    expect(listbox).toBeInTheDocument();
+    expect(listbox).toHaveTextContent(PORTAL_PLACEHOLDERS.ra);
+    expect(listbox).not.toHaveTextContent("invalid-ra");
+
+    fireEvent.mouseDown(within(listbox).getByRole("button"));
+
+    expect(raInput).toHaveValue(PORTAL_PLACEHOLDERS.ra);
+    expect(screen.getByLabelText("Dec")).toHaveValue(PORTAL_PLACEHOLDERS.dec);
+    expect(screen.getByLabelText("Field Size (deg)")).toHaveValue("0.5");
   });
 });

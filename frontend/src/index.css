@@ -12,19 +12,19 @@
   color-scheme: dark;
 
   --color-base-100: var(--ae-bg-surface);
-  --color-base-200: var(--ae-bg-canvas);
-  --color-base-300: var(--ae-bg-elevated);
+  --color-base-200: var(--ae-bg-elevated);
+  --color-base-300: var(--ae-bg-hover);
   --color-base-content: var(--ae-text-primary);
 
   --color-primary: var(--ae-accent-primary);
   --color-primary-content: var(--ae-accent-primary-content);
-  --color-secondary: var(--ae-accent-cyan);
-  --color-secondary-content: var(--ae-accent-cyan-content);
+  --color-secondary: var(--ae-accent-secondary);
+  --color-secondary-content: var(--ae-accent-secondary-content);
   --color-accent: var(--ae-accent-cyan);
   --color-accent-content: var(--ae-accent-cyan-content);
 
-  --color-neutral: var(--ae-bg-elevated);
-  --color-neutral-content: var(--ae-text-primary);
+  --color-neutral: var(--ae-neutral);
+  --color-neutral-content: var(--ae-neutral-content);
 
   --color-info: var(--ae-status-info);
   --color-success: var(--ae-status-success);
@@ -84,4 +84,19 @@
 .ae-field-input[aria-invalid="true"],
 .ae-field-input:user-invalid {
   border-color: var(--ae-status-error);
+}
+
+@keyframes ae-slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ae-slide-down {
+  animation: ae-slide-down 200ms ease-out;
 }

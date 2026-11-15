@@ -1,48 +1,52 @@
-/* Single Source of Truth (SSOT) for Astro Earth design tokens */
+/* Single Source of Truth (SSOT) for Astro Sentinella design tokens (synced with Penpot 01 Tokens y Paleta) */
 :root {
-  /* Color Palette - Dark Observatory */
-  --ae-bg-canvas: #090c12;
-  --ae-bg-surface: #0f141e;
-  --ae-bg-elevated: #161d2b;
-  --ae-bg-hover: #1d2638;
+  /* Color Palette - Penpot Astro Sentinella Dark */
+  --ae-bg-canvas: #090c11;
+  --ae-bg-surface: #111620;
+  --ae-bg-elevated: #171e2b;
+  --ae-bg-hover: #212a3b;
 
-  --ae-border-subtle: #232d3f;
-  --ae-border-strong: #32415a;
+  --ae-border-subtle: #1d2535;
+  --ae-border-strong: #2b364d;
 
-  --ae-text-primary: #e6edf7;
-  --ae-text-secondary: #b4c0d3;
-  --ae-text-muted: #8b9bb4;
+  --ae-text-primary: #e6ecf5;
+  --ae-text-secondary: #cbd5e1;
+  --ae-text-muted: #94a3b8;
 
-  --ae-accent-primary: #6397e8;
-  --ae-accent-primary-content: #090c12;
-  --ae-accent-cyan: #4fd1c5;
-  --ae-accent-cyan-content: #090c12;
+  --ae-accent-primary: #5b8fd9;
+  --ae-accent-primary-content: #07101c;
+  --ae-accent-secondary: #6b7896;
+  --ae-accent-secondary-content: #0b0e1a;
+  --ae-accent-cyan: #4ba39b;
+  --ae-accent-cyan-content: #061816;
+  --ae-neutral: #1e2636;
+  --ae-neutral-content: #cbd5e1;
 
-  --ae-status-info: #6397e8;
-  --ae-status-success: #4fd1c5;
-  --ae-status-warning: #e2b96f;
-  --ae-status-error: #e06c75;
+  --ae-status-info: #5b8fd9;
+  --ae-status-success: #34d399;
+  --ae-status-warning: #fbbf24;
+  --ae-status-error: #f87171;
 
   /* Backdrop Starfield Tokens */
-  --ae-star-muted: rgba(230, 237, 247, 0.25);
-  --ae-star-primary: rgba(99, 151, 232, 0.35);
-  --ae-star-dim: rgba(230, 237, 247, 0.2);
-  --ae-star-cyan: rgba(79, 209, 197, 0.28);
-  --ae-star-faint: rgba(230, 237, 247, 0.18);
+  --ae-star-muted: rgba(230, 236, 245, 0.25);
+  --ae-star-primary: rgba(91, 143, 217, 0.35);
+  --ae-star-dim: rgba(230, 236, 245, 0.2);
+  --ae-star-cyan: rgba(75, 163, 155, 0.28);
+  --ae-star-faint: rgba(230, 236, 245, 0.18);
 
-  /* Typography - Responsive clamp() with 14px minimum */
+  /* Typography - IBM Plex Sans & IBM Plex Mono with clamp() >= 14px */
   --ae-font-sans:
-    "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "IBM Plex Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
   --ae-font-mono:
-    "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
     monospace;
 
   --ae-text-sm: clamp(0.875rem, 0.85rem + 0.1vw, 0.9375rem);
-  --ae-text-base: clamp(0.875rem, 0.84rem + 0.2vw, 1rem);
-  --ae-text-lg: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);
-  --ae-text-xl: clamp(1.125rem, 1.05rem + 0.4vw, 1.375rem);
-  --ae-text-2xl: clamp(1.375rem, 1.2rem + 0.8vw, 1.75rem);
+  --ae-text-base: clamp(0.9375rem, 0.9rem + 0.15vw, 1rem);
+  --ae-text-lg: clamp(1rem, 0.96rem + 0.2vw, 1.125rem);
+  --ae-text-xl: clamp(1.125rem, 1.05rem + 0.35vw, 1.25rem);
+  --ae-text-2xl: clamp(1.5rem, 1.3rem + 0.9vw, 2rem);
 
   /* Radii, Controls & Layout Spacing */
   --ae-radius-sm: 0.375rem;
@@ -53,7 +57,7 @@
   --ae-focus-ring-offset: 2px;
 
   --ae-topbar-height: 3.25rem;
-  --ae-toolbar-width: 3.25rem;
+  --ae-toolbar-width: 3.5rem;
   --ae-inspector-width: 19rem;
-  --ae-timeline-height: 8.5rem;
+  --ae-timeline-height: 9.5rem;
 }
