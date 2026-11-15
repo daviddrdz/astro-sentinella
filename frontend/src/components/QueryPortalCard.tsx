@@ -73,11 +73,12 @@ export function QueryPortalCard({
     [coordinateMetadata]
   );
 
-  const selectedObservationDate = availableDates.includes(
-    values.observationDate
-  )
-    ? values.observationDate
-    : "";
+  const selectedObservationDate =
+    availableDates.length === 0
+      ? PORTAL_PLACEHOLDERS.observationDate
+      : availableDates.includes(values.observationDate)
+        ? values.observationDate
+        : "";
 
   const allErrors = useMemo(
     () =>
@@ -292,60 +293,71 @@ export function QueryPortalCard({
             </div>
 
             <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-3">
-              <div className="flex flex-col gap-1.5 sm:col-span-2">
-                <label
-                  htmlFor="portal-date"
-                  className="text-[length:var(--ae-text-sm)] font-medium text-[var(--ae-text-secondary)]"
-                >
-                  Observation Date
-                </label>
-                <select
-                  ref={dateSelectRef}
-                  id="portal-date"
-                  name="observationDate"
-                  required
-                  disabled={availableDates.length === 0}
-                  value={selectedObservationDate}
-                  onChange={(e) =>
-                    handleFieldChange("observationDate", e.target.value)
-                  }
-                  onBlur={() => handleFieldBlur("observationDate")}
-                  aria-invalid={
-                    visibleErrors.observationDate ? "true" : "false"
-                  }
-                  aria-describedby={
-                    visibleErrors.observationDate
-                      ? "portal-date-error"
-                      : undefined
-                  }
-                  className="select select-bordered ae-field-input w-full"
-                >
-                  <option value="" disabled>
-                    {availableDates.length > 0
-                      ? "Select observation date"
-                      : "No observation dates available"}
-                  </option>
-                  {availableDates.map((dateOption) => (
-                    <option key={dateOption} value={dateOption}>
-                      {dateOption}
-                    </option>
-                  ))}
-                </select>
-                {visibleErrors.observationDate && (
-                  <p
-                    id="portal-date-error"
-                    className="flex items-start gap-1.5 text-[length:var(--ae-text-sm)] text-[var(--ae-status-error)]"
+              {coordinatesReady && (
+                <div className="ae-slide-down flex flex-col gap-1.5 sm:col-span-2">
+                  <label
+                    htmlFor="portal-date"
+                    className="text-[length:var(--ae-text-sm)] font-medium text-[var(--ae-text-secondary)]"
                   >
-                    <AlertCircle
-                      className="mt-0.5 h-4 w-4 shrink-0"
-                      aria-hidden="true"
-                    />
-                    <span>{visibleErrors.observationDate}</span>
-                  </p>
-                )}
-              </div>
+                    Observation Date
+                  </label>
+                  <select
+                    ref={dateSelectRef}
+                    id="portal-date"
+                    name="observationDate"
+                    required
+                    value={selectedObservationDate}
+                    onChange={(e) =>
+                      handleFieldChange("observationDate", e.target.value)
+                    }
+                    onBlur={() => handleFieldBlur("observationDate")}
+                    aria-invalid={
+                      visibleErrors.observationDate ? "true" : "false"
+                    }
+                    aria-describedby={
+                      visibleErrors.observationDate
+                        ? "portal-date-error"
+                        : undefined
+                    }
+                    className="select select-bordered ae-field-input w-full"
+                  >
+                    {availableDates.length > 0 ? (
+                      <>
+                        <option value="" disabled>
+                          Select observation date
+                        </option>
+                        {availableDates.map((dateOption) => (
+                          <option key={dateOption} value={dateOption}>
+                            {dateOption}
+                          </option>
+                        ))}
+                      </>
+                    ) : (
+                      <option value={PORTAL_PLACEHOLDERS.observationDate}>
+                        {`Default (${PORTAL_PLACEHOLDERS.observationDate})`}
+                      </option>
+                    )}
+                  </select>
+                  {visibleErrors.observationDate && (
+                    <p
+                      id="portal-date-error"
+                      className="flex items-start gap-1.5 text-[length:var(--ae-text-sm)] text-[var(--ae-status-error)]"
+                    >
+                      <AlertCircle
+                        className="mt-0.5 h-4 w-4 shrink-0"
+                        aria-hidden="true"
+                      />
+                      <span>{visibleErrors.observationDate}</span>
+                    </p>
+                  )}
+                </div>
+              )}
 
-              <div className="flex flex-col justify-end">
+              <div
+                className={`flex flex-col justify-end ${
+                  coordinatesReady ? "" : "sm:col-span-3"
+                }`}
+              >
                 <button
                   type="submit"
                   className="btn btn-primary min-h-[var(--ae-control-height)] w-full text-[length:var(--ae-text-base)] font-semibold"

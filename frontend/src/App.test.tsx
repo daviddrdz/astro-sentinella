@@ -32,9 +32,7 @@ describe("Astro Earth Portal", () => {
       "aria-invalid",
       "false"
     );
-    const dateSelect = screen.getByLabelText("Observation Date");
-    expect(dateSelect).toHaveAttribute("aria-invalid", "false");
-    expect(dateSelect).toBeDisabled();
+    expect(screen.queryByLabelText("Observation Date")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Query" })).toBeInTheDocument();
   });
 
@@ -82,7 +80,7 @@ describe("Astro Earth Portal", () => {
     ).toBeInTheDocument();
   });
 
-  it("hides metadata panel and keeps date dropdown disabled when no metadata is available", async () => {
+  it("hides metadata panel, falls back to default Observation Date, and continues query when no metadata is available", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: false,
       status: 404,
@@ -103,7 +101,16 @@ describe("Astro Earth Portal", () => {
     expect(
       screen.queryByLabelText("Available coordinate metadata")
     ).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Observation Date")).toBeDisabled();
+
+    const dateSelect = screen.getByLabelText("Observation Date");
+    expect(dateSelect).toHaveValue(PORTAL_PLACEHOLDERS.observationDate);
+
+    fireEvent.change(screen.getByLabelText("Field Size (deg)"), {
+      target: { value: "0.5" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Query" }));
+
+    expect(screen.getByRole("heading", { name: "Layers" })).toBeInTheDocument();
   });
 
   it("validates fields on submit and focuses the first invalid input", () => {
