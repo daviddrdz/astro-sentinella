@@ -22,7 +22,6 @@ import { ExplorerTimeline } from "./ExplorerTimeline";
 import { ExplorerToolbar } from "./ExplorerToolbar";
 import { ExplorerTopBar } from "./ExplorerTopBar";
 import { LayersInspector } from "./LayersInspector";
-import { MobileLayersDrawer } from "./MobileLayersDrawer";
 
 interface ExplorerViewProps {
   query: QueryParams;
@@ -63,7 +62,6 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
   const [timelineTab, setTimelineTab] = useState<TimelineFilterTab>("all");
   const [bandFilter, setBandFilter] = useState<BandChannelId | "all">("all");
   const [isPlaying, setIsPlaying] = useState(false);
-  const [mobileLayersOpen, setMobileLayersOpen] = useState(false);
   const [docsOpen, setDocsOpen] = useState(false);
 
   useEffect(() => {
@@ -299,7 +297,6 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
       <ExplorerTopBar
         query={query}
         locale={locale}
-        layerCount={layers.length}
         canUndo={undoStack.length > EXPLORER_CONFIG.firstIndex}
         canRedo={redoStack.length > EXPLORER_CONFIG.firstIndex}
         onBackToPortal={onBackToPortal}
@@ -310,7 +307,6 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
         onToggleLocale={() =>
           setLocale((prev) => (prev === "en" ? "es" : "en"))
         }
-        onOpenMobileLayers={() => setMobileLayersOpen(true)}
       />
 
       <div className="flex min-h-0 flex-1">
@@ -360,19 +356,6 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
         onTogglePlay={() => setIsPlaying((prev) => !prev)}
         onStepBack={handleStepBack}
         onStepForward={handleStepForward}
-      />
-
-      <MobileLayersDrawer
-        open={mobileLayersOpen}
-        layers={layers}
-        activeLayerId={activeLayerId}
-        locale={locale}
-        onClose={() => setMobileLayersOpen(false)}
-        onSelectLayer={setActiveLayerId}
-        onToggleLayerVisibility={handleToggleLayerVisibility}
-        onAddLayer={handleAddLayer}
-        onUpdateLayer={handleUpdateLayer}
-        onMergeVisible={handleMergeVisible}
       />
 
       <DocsModal open={docsOpen} onClose={() => setDocsOpen(false)} />

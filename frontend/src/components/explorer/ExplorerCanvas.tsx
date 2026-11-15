@@ -90,7 +90,10 @@ export function ExplorerCanvas({
     EXPLORER_CONFIG.progressInitialPct
   );
 
-  const primaryUrl = activeFrame?.imageUrl ?? null;
+  const primaryUrl =
+    visibleLayers.length > EXPLORER_CONFIG.firstIndex
+      ? resolveLayerImageUrl(visibleLayers[EXPLORER_CONFIG.firstIndex], activeFrame)
+      : null;
   const primaryRetry = primaryUrl
     ? (retryCountByUrl[primaryUrl] ?? EXPLORER_CONFIG.firstIndex)
     : EXPLORER_CONFIG.firstIndex;
