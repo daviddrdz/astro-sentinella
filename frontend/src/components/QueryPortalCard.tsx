@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { AlertCircle, Database, History, Layers, Trash2 } from "lucide-react";
+import { AlertCircle, Database, Layers } from "lucide-react";
 import {
   APP_CONFIG,
   PORTAL_HISTORY_CONFIG,
@@ -7,7 +7,6 @@ import {
 } from "../config/app";
 import { fetchCoordinateMetadata } from "../services/metadataService";
 import {
-  clearQueryHistory,
   loadQueryHistory,
   saveQueryHistoryEntry,
 } from "../services/queryHistoryService";
@@ -173,26 +172,53 @@ export function QueryPortalCard({
 
   const raSuggestions = useMemo(() => {
     const term = values.ra.trim().toLowerCase();
-    return history.filter((item) =>
+    const matches = history.filter((item) =>
       term.length === PORTAL_HISTORY_CONFIG.emptyLength
         ? true
         : item.ra.toLowerCase().includes(term)
+    );
+    if (term.length > PORTAL_HISTORY_CONFIG.emptyLength) {
+      matches.sort((a, b) => {
+        const aStarts = a.ra.toLowerCase().startsWith(term);
+        const bStarts = b.ra.toLowerCase().startsWith(term);
+        if (aStarts === bStarts) {
+          return PORTAL_HISTORY_CONFIG.sortEqual;
+        }
+        return aStarts
+          ? PORTAL_HISTORY_CONFIG.sortPriorityFirst
+          : PORTAL_HISTORY_CONFIG.sortPrioritySecond;
+      });
+    }
+    return matches.slice(
+      PORTAL_HISTORY_CONFIG.emptyLength,
+      PORTAL_HISTORY_CONFIG.maxSuggestions
     );
   }, [history, values.ra]);
 
   const decSuggestions = useMemo(() => {
     const term = values.dec.trim().toLowerCase();
-    return history.filter((item) =>
+    const matches = history.filter((item) =>
       term.length === PORTAL_HISTORY_CONFIG.emptyLength
         ? true
         : item.dec.toLowerCase().includes(term)
     );
+    if (term.length > PORTAL_HISTORY_CONFIG.emptyLength) {
+      matches.sort((a, b) => {
+        const aStarts = a.dec.toLowerCase().startsWith(term);
+        const bStarts = b.dec.toLowerCase().startsWith(term);
+        if (aStarts === bStarts) {
+          return PORTAL_HISTORY_CONFIG.sortEqual;
+        }
+        return aStarts
+          ? PORTAL_HISTORY_CONFIG.sortPriorityFirst
+          : PORTAL_HISTORY_CONFIG.sortPrioritySecond;
+      });
+    }
+    return matches.slice(
+      PORTAL_HISTORY_CONFIG.emptyLength,
+      PORTAL_HISTORY_CONFIG.maxSuggestions
+    );
   }, [history, values.dec]);
-
-  const handleClearHistory = () => {
-    clearQueryHistory();
-    setHistory([]);
-  };
 
   return (
     <section className="w-full max-w-2xl">
@@ -500,47 +526,6 @@ export function QueryPortalCard({
               </div>
             </div>
           </form>
-
-          {history.length > PORTAL_HISTORY_CONFIG.emptyLength && (
-            <section
-              aria-label="Recent coordinate queries"
-              className="flex flex-col gap-2 border-t border-[var(--ae-border-subtle)] pt-4"
-            >
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-[length:var(--ae-text-sm)] font-medium text-[var(--ae-text-muted)]">
-                  <History
-                    className="h-3.5 w-3.5 shrink-0"
-                    aria-hidden="true"
-                  />
-                  <span>Recent</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={handleClearHistory}
-                  aria-label="Clear recent queries"
-                  className="btn btn-ghost btn-xs gap-1 text-[var(--ae-text-muted)] hover:text-[var(--ae-text-primary)]"
-                >
-                  <Trash2 className="h-3 w-3 shrink-0" aria-hidden="true" />
-                  <span>Clear</span>
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {history.map((entry) => {
-                  const label = `${entry.ra} | ${entry.dec} | ${entry.fieldSizeDeg} deg`;
-                  return (
-                    <button
-                      key={label}
-                      type="button"
-                      onClick={() => handleSelectHistory(entry)}
-                      className="btn btn-xs h-auto min-h-7 border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-elevated)] px-2.5 py-1 font-mono text-[length:var(--ae-text-sm)] font-normal text-[var(--ae-text-secondary)] hover:border-[var(--ae-primary)] hover:text-[var(--ae-text-primary)]"
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-          )}
 
           {coordinateMetadata && (
             <aside

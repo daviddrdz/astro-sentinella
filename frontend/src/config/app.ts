@@ -26,6 +26,10 @@ export const PORTAL_PLACEHOLDERS = {
 
 export const PORTAL_HISTORY_CONFIG = {
   storageKey: "astro-earth.portal-history.v1",
-  maxItems: 5,
+  maxItems: 50,
+  maxSuggestions: 10,
   emptyLength: 0,
+  sortPriorityFirst: -1,
+  sortPrioritySecond: 1,
+  sortEqual: 0,
 } as const;

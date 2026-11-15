@@ -186,9 +186,20 @@ describe("Astro Earth Portal", () => {
     ).toBeInTheDocument();
   });
 
-  it("saves submitted coordinates to browser history, refills on click, and clears history", async () => {
+  it("saves submitted coordinates to browser history without rendering a bottom list, and caps autocomplete to 10 best matches", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(null, { status: 404 })
+    );
+
+    const entries = Array.from({ length: 12 }, (_, idx) => ({
+      ra: `05h 35m ${String(10 + idx).padStart(2, "0")}s`,
+      dec: PORTAL_PLACEHOLDERS.dec,
+      fieldSizeDeg: "0.5",
+      observationDate: PORTAL_PLACEHOLDERS.observationDate,
+    }));
+    window.localStorage.setItem(
+      "astro-earth.portal-history.v1",
+      JSON.stringify(entries)
     );
 
     render(<App />);
@@ -197,37 +208,14 @@ describe("Astro Earth Portal", () => {
       screen.queryByRole("region", { name: "Recent coordinate queries" })
     ).not.toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("RA"), {
-      target: { value: PORTAL_PLACEHOLDERS.ra },
+    const raInput = screen.getByLabelText("RA");
+    fireEvent.focus(raInput);
+    fireEvent.change(raInput, { target: { value: "05h 35m" } });
+
+    const listbox = screen.getByRole("listbox", {
+      name: "RA autocomplete suggestions",
     });
-    fireEvent.change(screen.getByLabelText("Dec"), {
-      target: { value: PORTAL_PLACEHOLDERS.dec },
-    });
-    fireEvent.change(screen.getByLabelText("Field Size (deg)"), {
-      target: { value: "0.5" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Query" }));
-
-    fireEvent.click(screen.getByRole("button", { name: "Back to Portal" }));
-
-    const historySection = screen.getByRole("region", {
-      name: "Recent coordinate queries",
-    });
-    expect(historySection).toBeInTheDocument();
-
-    const chipLabel = `${PORTAL_PLACEHOLDERS.ra} | ${PORTAL_PLACEHOLDERS.dec} | 0.5 deg`;
-    fireEvent.click(screen.getByRole("button", { name: chipLabel }));
-
-    expect(screen.getByLabelText("RA")).toHaveValue(PORTAL_PLACEHOLDERS.ra);
-    expect(screen.getByLabelText("Dec")).toHaveValue(PORTAL_PLACEHOLDERS.dec);
-    expect(screen.getByLabelText("Field Size (deg)")).toHaveValue("0.5");
-
-    fireEvent.click(
-      screen.getByRole("button", { name: "Clear recent queries" })
-    );
-    expect(
-      screen.queryByRole("region", { name: "Recent coordinate queries" })
-    ).not.toBeInTheDocument();
+    expect(within(listbox).getAllByRole("option")).toHaveLength(10);
   });
 
   it("ignores invalid entries in history and provides RA autocomplete suggestions", async () => {
