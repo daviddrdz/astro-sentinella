@@ -60,4 +60,6 @@ def frame_image():
         current_app.logger.exception("Frame image lookup failed")
         return error_response(502, "image_source_unavailable", "The image archive is unavailable.")
 
-    return Response(png_bytes, mimetype="image/png")
+    resp = Response(png_bytes, mimetype="image/png")
+    resp.headers["Cache-Control"] = "public, max-age=3600"
+    return resp
