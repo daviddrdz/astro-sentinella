@@ -1,4 +1,9 @@
-import { COORDINATE_LIMITS, PORTAL_PLACEHOLDERS } from "../config/app";
+import {
+  COORDINATE_LIMITS,
+  PORTAL_HISTORY_CONFIG,
+  PORTAL_PLACEHOLDERS,
+  URL_QUERY_CONFIG,
+} from "../config/app";
 import type { QueryParams } from "../types/portal";
 
 const RA_HMS_PATTERN =
@@ -165,4 +170,62 @@ export function parseDecToDegrees(value: string): number | null {
     }
   }
   return null;
+}
+
+export function parseUrlQueryParams(search: string): {
+  initialValues: QueryParams;
+  autoExplore: boolean;
+} {
+  const params = new URLSearchParams(search);
+  const ra = (params.get(URL_QUERY_CONFIG.raKey) ?? "").trim();
+  const dec = (params.get(URL_QUERY_CONFIG.decKey) ?? "").trim();
+  const rawFov = (
+    params.get(URL_QUERY_CONFIG.fovKey) ??
+    params.get(URL_QUERY_CONFIG.fieldSizeKey) ??
+    ""
+  ).trim();
+  const observationDate = (
+    params.get(URL_QUERY_CONFIG.dateKey) ??
+    params.get(URL_QUERY_CONFIG.observationDateKey) ??
+    ""
+  ).trim();
+
+  const hasCoords = Boolean(ra || dec);
+  const fieldSizeDeg =
+    rawFov || (hasCoords ? URL_QUERY_CONFIG.defaultFieldSizeDeg : "");
+
+  const initialValues: QueryParams = {
+    ra,
+    dec,
+    fieldSizeDeg,
+    observationDate,
+  };
+
+  const autoExplore =
+    Boolean(ra && dec && fieldSizeDeg && observationDate) &&
+    Object.keys(validateQueryParams(initialValues)).length ===
+      PORTAL_HISTORY_CONFIG.emptyLength;
+
+  return { initialValues, autoExplore };
+}
+
+export function buildUrlSearchString(params: Partial<QueryParams>): string {
+  const urlParams = new URLSearchParams();
+  if (params.ra?.trim()) {
+    urlParams.set(URL_QUERY_CONFIG.raKey, params.ra.trim());
+  }
+  if (params.dec?.trim()) {
+    urlParams.set(URL_QUERY_CONFIG.decKey, params.dec.trim());
+  }
+  if (params.fieldSizeDeg?.trim()) {
+    urlParams.set(
+      URL_QUERY_CONFIG.fovKey,
+      params.fieldSizeDeg.trim().replace(/\s*deg\s*$/i, "")
+    );
+  }
+  if (params.observationDate?.trim()) {
+    urlParams.set(URL_QUERY_CONFIG.dateKey, params.observationDate.trim());
+  }
+  const str = urlParams.toString();
+  return str ? `?${str}` : "";
 }

@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
+  Compass,
   Database,
   Layers,
   Loader2,
@@ -9,8 +10,10 @@ import {
 } from "lucide-react";
 import {
   APP_CONFIG,
+  PORTAL_FEATURED_SECTORS,
   PORTAL_HISTORY_CONFIG,
   PORTAL_PLACEHOLDERS,
+  type FeaturedSector,
 } from "../config/app";
 import { fetchCoordinateMetadata } from "../services/metadataService";
 import {
@@ -226,6 +229,18 @@ export function QueryPortalCard({
 
   const handleSelectHistory = (entry: QueryParams) => {
     setValues(entry);
+    setHasSubmitted(false);
+    setTouched({});
+    setAutocompleteField(null);
+  };
+
+  const handleSelectSector = (sector: FeaturedSector) => {
+    setValues({
+      ra: sector.ra,
+      dec: sector.dec,
+      fieldSizeDeg: sector.fieldSizeDeg,
+      observationDate: "",
+    });
     setHasSubmitted(false);
     setTouched({});
     setAutocompleteField(null);
@@ -619,6 +634,44 @@ export function QueryPortalCard({
               </div>
             </div>
           </form>
+
+          <section
+            aria-label="SPHEREx target sectors"
+            className="flex flex-col gap-2 border-t border-[var(--ae-border-subtle)] pt-4"
+          >
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-[length:var(--ae-text-sm)] font-medium text-[var(--ae-text-muted)]">
+                <Compass className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span>SPHEREx Target Sectors</span>
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {PORTAL_FEATURED_SECTORS.map((sector) => {
+                const isSelected =
+                  values.ra.trim() === sector.ra &&
+                  values.dec.trim() === sector.dec;
+                return (
+                  <button
+                    key={sector.id}
+                    type="button"
+                    onClick={() => handleSelectSector(sector)}
+                    className={`btn btn-xs h-auto min-h-7 gap-1.5 border px-2.5 py-1 text-[length:var(--ae-text-sm)] font-normal transition-colors ${
+                      isSelected
+                        ? "border-[var(--ae-primary)] bg-[var(--ae-primary)]/15 text-[var(--ae-text-primary)]"
+                        : "border-[var(--ae-border-subtle)] bg-[var(--ae-bg-elevated)] text-[var(--ae-text-secondary)] hover:border-[var(--ae-primary)] hover:text-[var(--ae-text-primary)]"
+                    }`}
+                  >
+                    <span className="font-medium text-[var(--ae-text-primary)]">
+                      {sector.name}
+                    </span>
+                    <span className="font-mono text-xs text-[var(--ae-text-muted)]">
+                      {sector.category}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
 
           {coordinateMetadata && (
             <aside
