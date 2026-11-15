@@ -63,7 +63,8 @@ function resolveLayerImageUrl(
   activeFrame: ExplorerFrame | null
 ): string | null {
   const layerSource = layer as ExplorerLayer & ImageSourceCarrier;
-  const frameSource = activeFrame as (ExplorerFrame & ImageSourceCarrier) | null;
+  const frameSource = activeFrame as
+    (ExplorerFrame & ImageSourceCarrier) | null;
 
   return (
     layerSource.imageUrl ??
@@ -131,7 +132,7 @@ export function ExplorerCanvas({
                 <div className="relative h-full w-full">
                   <img
                     src={imageUrl}
-                    alt={`${layer.name ?? layer.id} astronomical cutout`}
+                    alt={`${layer.code} astronomical cutout`}
                     draggable={false}
                     className="h-full w-full object-contain"
                   />
