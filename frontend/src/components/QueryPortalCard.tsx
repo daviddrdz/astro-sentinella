@@ -1,7 +1,16 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { AlertCircle, Database, Layers } from "lucide-react";
-import { APP_CONFIG, PORTAL_PLACEHOLDERS } from "../config/app";
+import { AlertCircle, Database, History, Layers, Trash2 } from "lucide-react";
+import {
+  APP_CONFIG,
+  PORTAL_HISTORY_CONFIG,
+  PORTAL_PLACEHOLDERS,
+} from "../config/app";
 import { fetchCoordinateMetadata } from "../services/metadataService";
+import {
+  clearQueryHistory,
+  loadQueryHistory,
+  saveQueryHistoryEntry,
+} from "../services/queryHistoryService";
 import type { CoordinateMetadata, QueryParams } from "../types/portal";
 import {
   hasValidCoordinates,
@@ -36,6 +45,9 @@ export function QueryPortalCard({
   const [values, setValues] = useState<QueryParams>(initialValues);
   const [touched, setTouched] = useState<TouchedFields>({});
   const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [history, setHistory] = useState<QueryParams[]>(() =>
+    loadQueryHistory()
+  );
   const [fetchedMetadata, setFetchedMetadata] = useState<{
     key: string;
     data: CoordinateMetadata;
@@ -137,14 +149,27 @@ export function QueryPortalCard({
       return;
     }
 
-    onSubmitQuery({
+    const normalizedQuery: QueryParams = {
       ra: submissionValues.ra.trim(),
       dec: submissionValues.dec.trim(),
       fieldSizeDeg: submissionValues.fieldSizeDeg
         .trim()
         .replace(/\s*deg\s*$/i, ""),
       observationDate: submissionValues.observationDate.trim(),
-    });
+    };
+    setHistory(saveQueryHistoryEntry(normalizedQuery));
+    onSubmitQuery(normalizedQuery);
+  };
+
+  const handleSelectHistory = (entry: QueryParams) => {
+    setValues(entry);
+    setHasSubmitted(false);
+    setTouched({});
+  };
+
+  const handleClearHistory = () => {
+    clearQueryHistory();
+    setHistory([]);
   };
 
   return (
@@ -367,6 +392,47 @@ export function QueryPortalCard({
               </div>
             </div>
           </form>
+
+          {history.length > PORTAL_HISTORY_CONFIG.emptyLength && (
+            <section
+              aria-label="Recent coordinate queries"
+              className="flex flex-col gap-2 border-t border-[var(--ae-border-subtle)] pt-4"
+            >
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-[length:var(--ae-text-sm)] font-medium text-[var(--ae-text-muted)]">
+                  <History
+                    className="h-3.5 w-3.5 shrink-0"
+                    aria-hidden="true"
+                  />
+                  <span>Recent</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={handleClearHistory}
+                  aria-label="Clear recent queries"
+                  className="btn btn-ghost btn-xs gap-1 text-[var(--ae-text-muted)] hover:text-[var(--ae-text-primary)]"
+                >
+                  <Trash2 className="h-3 w-3 shrink-0" aria-hidden="true" />
+                  <span>Clear</span>
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {history.map((entry) => {
+                  const label = `${entry.ra} | ${entry.dec} | ${entry.fieldSizeDeg} deg`;
+                  return (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={() => handleSelectHistory(entry)}
+                      className="btn btn-xs h-auto min-h-7 border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-elevated)] px-2.5 py-1 font-mono text-[length:var(--ae-text-sm)] font-normal text-[var(--ae-text-secondary)] hover:border-[var(--ae-primary)] hover:text-[var(--ae-text-primary)]"
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          )}
 
           {coordinateMetadata && (
             <aside

@@ -23,3 +23,9 @@ export const PORTAL_PLACEHOLDERS = {
   fieldSizeDeg: "0.5 deg",
   observationDate: "2026-10-12",
 } as const;
+
+export const PORTAL_HISTORY_CONFIG = {
+  storageKey: "astro-earth.portal-history.v1",
+  maxItems: 5,
+  emptyLength: 0,
+} as const;
