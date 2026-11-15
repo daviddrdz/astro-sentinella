@@ -1,5 +1,5 @@
 import { SiGithub } from "@icons-pack/react-simple-icons";
-import { APP_CONFIG } from "../config/app";
+import { APP_CONFIG, ICON_SIZES } from "../config/app";
 
 interface PortalNavbarProps {
   onOpenDocs: () => void;
@@ -28,7 +28,7 @@ export function PortalNavbar({ onOpenDocs }: PortalNavbarProps) {
           aria-label="GitHub"
           className="btn btn-ghost btn-sm btn-square text-[var(--ae-text-secondary)] hover:text-[var(--ae-text-primary)]"
         >
-          <SiGithub size={18} aria-hidden="true" />
+          <SiGithub size={ICON_SIZES.navbarBrand} aria-hidden="true" />
         </a>
       </nav>
     </header>

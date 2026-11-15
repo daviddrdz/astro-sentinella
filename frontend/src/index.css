@@ -52,19 +52,19 @@
   }
 
   :is(a, button, input, select, textarea):focus-visible {
-    outline: 2px solid var(--ae-accent-primary);
-    outline-offset: 2px;
+    outline: var(--ae-focus-ring-width) solid var(--ae-accent-primary);
+    outline-offset: var(--ae-focus-ring-offset);
   }
 }
 
 .ae-portal-backdrop {
   background-color: var(--ae-bg-canvas);
   background-image:
-    radial-gradient(1px 1px at 14% 22%, rgba(230, 237, 247, 0.25), transparent),
-    radial-gradient(1px 1px at 78% 18%, rgba(99, 151, 232, 0.35), transparent),
-    radial-gradient(1px 1px at 32% 76%, rgba(230, 237, 247, 0.2), transparent),
-    radial-gradient(1px 1px at 88% 72%, rgba(79, 209, 197, 0.28), transparent),
-    radial-gradient(1px 1px at 56% 12%, rgba(230, 237, 247, 0.18), transparent);
+    radial-gradient(1px 1px at 14% 22%, var(--ae-star-muted), transparent),
+    radial-gradient(1px 1px at 78% 18%, var(--ae-star-primary), transparent),
+    radial-gradient(1px 1px at 32% 76%, var(--ae-star-dim), transparent),
+    radial-gradient(1px 1px at 88% 72%, var(--ae-star-cyan), transparent),
+    radial-gradient(1px 1px at 56% 12%, var(--ae-star-faint), transparent);
 }
 
 .ae-field-input {
@@ -73,7 +73,7 @@
   color: var(--ae-text-primary);
   font-family: var(--ae-font-mono);
   font-size: var(--ae-text-base);
-  min-height: 2.75rem;
+  min-height: var(--ae-control-height);
 }
 
 .ae-field-input::placeholder {

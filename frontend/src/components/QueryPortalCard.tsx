@@ -311,7 +311,7 @@ export function QueryPortalCard({
               <div className="flex flex-col justify-end">
                 <button
                   type="submit"
-                  className="btn btn-primary min-h-[2.75rem] w-full text-[length:var(--ae-text-base)] font-semibold"
+                  className="btn btn-primary min-h-[var(--ae-control-height)] w-full text-[length:var(--ae-text-base)] font-semibold"
                 >
                   Query
                 </button>

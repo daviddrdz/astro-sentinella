@@ -13,6 +13,10 @@ export const COORDINATE_LIMITS = {
   fieldSizeMaxDeg: 10,
 } as const;
 
+export const ICON_SIZES = {
+  navbarBrand: 18,
+} as const;
+
 export const PORTAL_PLACEHOLDERS = {
   ra: "05h 35m 17s",
   dec: "-05° 23' 28\"",
