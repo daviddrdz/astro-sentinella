@@ -123,7 +123,7 @@ export function QueryPortalCard({
   );
 
   const selectedObservationDate =
-    availableDates.length === 0
+    availableDates.length === PORTAL_HISTORY_CONFIG.emptyLength
       ? PORTAL_PLACEHOLDERS.observationDate
       : availableDates.includes(values.observationDate)
         ? values.observationDate
@@ -181,7 +181,9 @@ export function QueryPortalCard({
     };
     const submissionErrors = validateQueryParams(submissionValues);
 
-    if (Object.keys(submissionErrors).length > 0) {
+    if (
+      Object.keys(submissionErrors).length > PORTAL_HISTORY_CONFIG.emptyLength
+    ) {
       focusFirstInvalidField(submissionErrors);
       return;
     }

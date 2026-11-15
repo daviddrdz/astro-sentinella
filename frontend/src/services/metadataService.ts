@@ -1,4 +1,4 @@
-import { APP_CONFIG } from "../config/app";
+import { APP_CONFIG, PORTAL_HISTORY_CONFIG } from "../config/app";
 import type { CoordinateMetadata } from "../types/portal";
 
 export async function fetchCoordinateMetadata(
@@ -29,7 +29,9 @@ export async function fetchCoordinateMetadata(
     }
     const availableDates = Array.isArray(data.availableDates)
       ? data.availableDates.filter(
-          (item): item is string => typeof item === "string" && item.length > 0
+          (item): item is string =>
+            typeof item === "string" &&
+            item.length > PORTAL_HISTORY_CONFIG.emptyLength
         )
       : [];
 
