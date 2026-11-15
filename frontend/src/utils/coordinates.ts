@@ -100,3 +100,69 @@ export function formatFieldSizeDisplay(value: string): string {
   const cleaned = value.trim().replace(/\s*deg\s*$/i, "");
   return `${cleaned} deg`;
 }
+
+const RA_PARTS_PATTERN =
+  /^\s*(\d{1,2})\s*(?:h|:|\s)\s*(\d{1,2})\s*(?:m|:|\s)\s*(\d{1,2}(?:\.\d+)?)\s*s?\s*$/i;
+const DEC_PARTS_PATTERN =
+  /^\s*([+-]?)\s*(\d{1,2})\s*(?:°|deg|d|:|\s)\s*(\d{1,2})\s*(?:'|m|:|\s)\s*(\d{1,2}(?:\.\d+)?)\s*(?:"|s)?\s*$/i;
+
+const HOURS_TO_DEG = 15;
+const MINUTES_PER_UNIT = 60;
+const SECONDS_PER_UNIT = 3600;
+const SIGN_NEGATIVE = -1;
+const SIGN_POSITIVE = 1;
+const GROUP_ONE = 1;
+const GROUP_TWO = 2;
+const GROUP_THREE = 3;
+const GROUP_FOUR = 4;
+
+export function parseRaToDegrees(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const hmsMatch = RA_PARTS_PATTERN.exec(trimmed);
+  if (hmsMatch) {
+    const hours = Number(hmsMatch[GROUP_ONE]);
+    const minutes = Number(hmsMatch[GROUP_TWO]);
+    const seconds = Number(hmsMatch[GROUP_THREE]);
+    return (
+      (hours + minutes / MINUTES_PER_UNIT + seconds / SECONDS_PER_UNIT) *
+      HOURS_TO_DEG
+    );
+  }
+  if (DECIMAL_NUMBER_PATTERN.test(trimmed)) {
+    const deg = Number(trimmed);
+    if (deg >= COORDINATE_LIMITS.raMinDeg && deg < COORDINATE_LIMITS.raMaxDeg) {
+      return deg;
+    }
+  }
+  return null;
+}
+
+export function parseDecToDegrees(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const dmsMatch = DEC_PARTS_PATTERN.exec(trimmed);
+  if (dmsMatch) {
+    const sign = dmsMatch[GROUP_ONE] === "-" ? SIGN_NEGATIVE : SIGN_POSITIVE;
+    const degrees = Number(dmsMatch[GROUP_TWO]);
+    const arcmin = Number(dmsMatch[GROUP_THREE]);
+    const arcsec = Number(dmsMatch[GROUP_FOUR]);
+    return (
+      sign * (degrees + arcmin / MINUTES_PER_UNIT + arcsec / SECONDS_PER_UNIT)
+    );
+  }
+  if (DECIMAL_NUMBER_PATTERN.test(trimmed)) {
+    const deg = Number(trimmed);
+    if (
+      deg >= COORDINATE_LIMITS.decMinDeg &&
+      deg <= COORDINATE_LIMITS.decMaxDeg
+    ) {
+      return deg;
+    }
+  }
+  return null;
+}

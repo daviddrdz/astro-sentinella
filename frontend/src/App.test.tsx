@@ -18,6 +18,8 @@ describe("Astro Sentinella Portal", () => {
   it("renders navbar links and the four portal query inputs", () => {
     render(<App />);
 
+    expect(screen.getByTestId("portal-space-backdrop")).toBeInTheDocument();
+    expect(screen.getByTestId("portal-space-backdrop")).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: APP_CONFIG.name })
     ).toBeInTheDocument();

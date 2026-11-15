@@ -27,6 +27,7 @@ import {
 interface QueryPortalCardProps {
   initialValues?: QueryParams;
   onSubmitQuery: (params: QueryParams) => void;
+  onCoordinatesChange?: (ra: string, dec: string, fieldSizeDeg: string) => void;
 }
 
 const EMPTY_VALUES: QueryParams = {
@@ -41,6 +42,7 @@ type TouchedFields = Partial<Record<keyof QueryParams, boolean>>;
 export function QueryPortalCard({
   initialValues = EMPTY_VALUES,
   onSubmitQuery,
+  onCoordinatesChange,
 }: QueryPortalCardProps) {
   const headingId = useId();
   const raInputRef = useRef<HTMLInputElement>(null);
@@ -64,18 +66,27 @@ export function QueryPortalCard({
   const [debouncedCoords, setDebouncedCoords] = useState<{
     ra: string;
     dec: string;
-  }>({ ra: initialValues.ra, dec: initialValues.dec });
+    fieldSizeDeg: string;
+  }>({
+    ra: initialValues.ra,
+    dec: initialValues.dec,
+    fieldSizeDeg: initialValues.fieldSizeDeg,
+  });
   const [retryToken, setRetryToken] = useState<number>(
     PORTAL_HISTORY_CONFIG.emptyLength
   );
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setDebouncedCoords({ ra: values.ra, dec: values.dec });
+      setDebouncedCoords({
+        ra: values.ra,
+        dec: values.dec,
+        fieldSizeDeg: values.fieldSizeDeg,
+      });
     }, APP_CONFIG.metadataDebounceMs);
 
     return () => window.clearTimeout(timer);
-  }, [values.ra, values.dec]);
+  }, [values.ra, values.dec, values.fieldSizeDeg]);
 
   const coordinatesReady = hasValidCoordinates(
     debouncedCoords.ra,
@@ -151,6 +162,19 @@ export function QueryPortalCard({
   const handleFieldChange = (field: keyof QueryParams, nextValue: string) => {
     setValues((prev) => ({ ...prev, [field]: nextValue }));
   };
+
+  useEffect(() => {
+    onCoordinatesChange?.(
+      debouncedCoords.ra,
+      debouncedCoords.dec,
+      debouncedCoords.fieldSizeDeg
+    );
+  }, [
+    debouncedCoords.ra,
+    debouncedCoords.dec,
+    debouncedCoords.fieldSizeDeg,
+    onCoordinatesChange,
+  ]);
 
   const handleFieldBlur = (field: keyof QueryParams) => {
     if (values[field].trim() !== "" || hasSubmitted) {
