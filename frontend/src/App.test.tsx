@@ -40,7 +40,7 @@ describe("Astro Sentinella Portal", () => {
       "false"
     );
     expect(screen.queryByLabelText("Observation Date")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Query" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Explore" })).toBeInTheDocument();
   });
 
   it("fetches metadata and populates Observation Date options from coordinates without clicking Query", async () => {
@@ -115,7 +115,7 @@ describe("Astro Sentinella Portal", () => {
     fireEvent.change(screen.getByLabelText("Field Size (deg)"), {
       target: { value: "0.5" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Query" }));
+    fireEvent.click(screen.getByRole("button", { name: "Explore" }));
 
     expect(screen.getByRole("heading", { name: "Layers" })).toBeInTheDocument();
   });
@@ -123,7 +123,7 @@ describe("Astro Sentinella Portal", () => {
   it("validates fields on submit and focuses the first invalid input", () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Query" }));
+    fireEvent.click(screen.getByRole("button", { name: "Explore" }));
 
     const raInput = screen.getByLabelText("RA");
     expect(raInput).toHaveAttribute("aria-invalid", "true");
@@ -165,7 +165,7 @@ describe("Astro Sentinella Portal", () => {
       target: { value: PORTAL_PLACEHOLDERS.observationDate },
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Query" }));
+    fireEvent.click(screen.getByRole("button", { name: "Explore" }));
 
     expect(screen.getByRole("heading", { name: "Layers" })).toBeInTheDocument();
     expect(
@@ -175,7 +175,7 @@ describe("Astro Sentinella Portal", () => {
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Back to Portal" }));
-    expect(screen.getByRole("button", { name: "Query" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Explore" })).toBeInTheDocument();
   });
 
   it("opens documentation dialog from navbar", () => {

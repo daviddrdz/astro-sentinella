@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { AlertCircle, Database, Layers } from "lucide-react";
+import { AlertCircle, Database, Layers, Telescope } from "lucide-react";
 import {
   APP_CONFIG,
   PORTAL_HISTORY_CONFIG,
@@ -518,9 +518,10 @@ export function QueryPortalCard({
               >
                 <button
                   type="submit"
-                  className="btn btn-primary min-h-[var(--ae-control-height)] w-full text-[length:var(--ae-text-base)] font-semibold"
+                  className="btn btn-primary min-h-[var(--ae-control-height)] w-full gap-2 text-[length:var(--ae-text-base)] font-semibold"
                 >
-                  Query
+                  <Telescope className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span>Explore</span>
                 </button>
               </div>
             </div>
