@@ -22,7 +22,7 @@ export const EXPLORER_CONFIG = {
   opacityMax: 100,
   opacityStep: 1,
   defaultNewLayerOpacity: 80,
-  zoomMin: 0.5,
+  zoomMin: 0.35,
   zoomMax: 4,
   zoomStep: 0.25,
   zoomDefault: 1,

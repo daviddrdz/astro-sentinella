@@ -17,11 +17,23 @@ import type {
 import type { QueryParams } from "../../types/portal";
 import { clamp01, containedBox, type Size } from "../../utils/spectrum";
 import { formatAngularSeparation } from "../../utils/frameMetrics";
+import {
+  formatDecSexagesimal,
+  formatRaSexagesimal,
+  parseSexagesimalDecDeg,
+  parseSexagesimalRaDeg,
+  SKY3D_CONSTANTS,
+} from "../../config/sky3dCatalog";
 
 const DEFAULT_FIELD_SIZE_DEG = 0.5;
 const RULER_MAX_POINTS = 2;
 const RULER_HALF = 0.5;
 const RULER_PCT = 100;
+const ZOOM_OUT_TILES_THRESHOLD = 0.92;
+const TILE_OFFSETS = [-1, 0, 1] as const;
+const MIN_COS_DEC = 0.15;
+const MAX_ABS_DEC_DEG = 89.5;
+const FULL_CIRCLE_DEG = 360;
 
 interface ExplorerCanvasProps {
   query: QueryParams;
@@ -151,6 +163,69 @@ export function ExplorerCanvas({
   const [rulerPoints, setRulerPoints] = useState<
     Array<{ x: number; y: number }>
   >([]);
+  const [loadedTiles, setLoadedTiles] = useState<Record<string, boolean>>({});
+
+  const showSurroundingSectors = zoomLevel < ZOOM_OUT_TILES_THRESHOLD;
+  const surroundingTiles = showSurroundingSectors
+    ? (() => {
+        const centerRa = parseSexagesimalRaDeg(query.ra);
+        const centerDec = parseSexagesimalDecDeg(query.dec);
+        const fieldDeg = Number(query.fieldSizeDeg) || DEFAULT_FIELD_SIZE_DEG;
+        const cosDec = Math.max(
+          MIN_COS_DEC,
+          Math.cos(centerDec * SKY3D_CONSTANTS.degToRad)
+        );
+        const tiles: Array<{
+          key: string;
+          col: number;
+          row: number;
+          raDisplay: string;
+          decDisplay: string;
+          imageUrl: string | null;
+        }> = [];
+        for (const row of TILE_OFFSETS) {
+          for (const col of TILE_OFFSETS) {
+            if (col === 0 && row === 0) continue;
+            const nDec = Math.max(
+              -MAX_ABS_DEC_DEG,
+              Math.min(MAX_ABS_DEC_DEG, centerDec - row * fieldDeg)
+            );
+            const nRa =
+              (((centerRa - (col * fieldDeg) / cosDec) % FULL_CIRCLE_DEG) +
+                FULL_CIRCLE_DEG) %
+              FULL_CIRCLE_DEG;
+            const raDisplay = formatRaSexagesimal(nRa);
+            const decDisplay = formatDecSexagesimal(nDec);
+            const frameUrl = activeFrame?.imageUrl ?? null;
+            const canFetchTile =
+              frameUrl &&
+              (frameUrl.includes("/image") ||
+                frameUrl.startsWith("/api/") ||
+                frameUrl.startsWith("http"));
+            let imageUrl: string | null = null;
+            if (canFetchTile) {
+              const params = new URLSearchParams({
+                ra: raDisplay,
+                dec: decDisplay,
+                fieldSizeDeg: String(fieldDeg),
+                observationDate:
+                  activeFrame?.timestamp ?? query.observationDate.trim(),
+              });
+              imageUrl = `${EXPLORER_CONFIG.framesEndpoint}/image?${params.toString()}`;
+            }
+            tiles.push({
+              key: `${col}:${row}`,
+              col,
+              row,
+              raDisplay,
+              decDisplay,
+              imageUrl,
+            });
+          }
+        }
+        return tiles;
+      })()
+    : [];
 
   // Unscaled layout size of the frame box; the zoom transform is applied on top.
   useEffect(() => {
@@ -310,13 +385,50 @@ export function ExplorerCanvas({
       {/* Stacked photogram layers or Compare subtraction view */}
       <div
         ref={frameRef}
-        className={`relative h-[78%] w-[86%] max-w-3xl overflow-hidden rounded-lg border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-canvas)] shadow-2xl ${
-          isDragging ? "" : "transition-transform duration-200"
-        }`}
+        className={`relative h-[78%] w-[86%] max-w-3xl rounded-lg border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-canvas)] shadow-2xl ${
+          showSurroundingSectors ? "overflow-visible" : "overflow-hidden"
+        } ${isDragging ? "" : "transition-transform duration-200"}`}
         style={{
           transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomLevel})`,
         }}
       >
+        {showSurroundingSectors && (
+          <div
+            data-testid="surrounding-sectors"
+            className="pointer-events-none"
+          >
+            {surroundingTiles.map((tile) => (
+              <div
+                key={tile.key}
+                style={{
+                  left: `${tile.col * RULER_PCT}%`,
+                  top: `${tile.row * RULER_PCT}%`,
+                }}
+                className="absolute h-full w-full overflow-hidden rounded-lg border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-surface)]/45"
+              >
+                {tile.imageUrl && (
+                  <img
+                    src={tile.imageUrl}
+                    alt={`${tile.raDisplay} ${tile.decDisplay}`}
+                    loading="lazy"
+                    onLoad={() =>
+                      setLoadedTiles((prev) => ({
+                        ...prev,
+                        [tile.key]: true,
+                      }))
+                    }
+                    className={`h-full w-full object-contain transition-opacity duration-200 ${
+                      loadedTiles[tile.key] ? "opacity-85" : "opacity-0"
+                    }`}
+                  />
+                )}
+                <div className="absolute top-2 left-2 rounded border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-base)]/80 px-2 py-0.5 font-mono text-xs text-[var(--ae-text-muted)]">
+                  {tile.raDisplay} {tile.decDisplay}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         {activeSubtraction ? (
           <div className="relative flex h-full w-full items-center justify-center bg-[var(--ae-bg-elevated)]/40 p-4">
             <div className="pointer-events-none absolute top-3 left-3 z-10 rounded border border-[var(--ae-border-strong)] bg-[var(--ae-bg-base)]/85 px-2.5 py-1 font-mono text-xs text-[var(--ae-text-primary)]">
