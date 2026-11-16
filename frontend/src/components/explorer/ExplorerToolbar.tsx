@@ -1,13 +1,4 @@
-import {
-  ChartSpline,
-  Columns2,
-  Diff,
-  Hand,
-  RotateCcw,
-  Ruler,
-  SquareDashed,
-  ZoomIn,
-} from "lucide-react";
+import { ChartSpline, Diff, Hand, RotateCcw } from "lucide-react";
 import { EXPLORER_CONFIG, EXPLORER_TOOLS } from "../../config/explorer";
 import type { ExplorerLocale, ExplorerToolId } from "../../types/explorer";
 
@@ -22,16 +13,8 @@ function ToolIcon({ id }: { id: ExplorerToolId }) {
   switch (id) {
     case "hand":
       return <Hand size={size} aria-hidden="true" />;
-    case "zoom":
-      return <ZoomIn size={size} aria-hidden="true" />;
-    case "split":
-      return <Columns2 size={size} aria-hidden="true" />;
     case "subtract":
       return <Diff size={size} aria-hidden="true" />;
-    case "region":
-      return <SquareDashed size={size} aria-hidden="true" />;
-    case "ruler":
-      return <Ruler size={size} aria-hidden="true" />;
     case "spectrum":
       return <ChartSpline size={size} aria-hidden="true" />;
     case "reset":
