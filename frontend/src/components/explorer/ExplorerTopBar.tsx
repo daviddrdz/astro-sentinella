@@ -2,9 +2,7 @@ import { SiGithub } from "@icons-pack/react-simple-icons";
 import {
   ArrowLeft,
   BookOpen,
-  ChevronDown,
   // GitMerge,
-  Globe,
   Menu,
   Redo2,
   Telescope,
@@ -27,7 +25,7 @@ interface ExplorerTopBarProps {
   onRedo: () => void;
   onMergeExport?: () => void;
   onOpenDocs: () => void;
-  onToggleLocale: () => void;
+  onToggleLocale?: () => void;
 }
 
 function formatFieldSizeArcmin(fieldSizeDeg: string): string {
@@ -50,7 +48,6 @@ export function ExplorerTopBar({
   onUndo,
   onRedo,
   onOpenDocs,
-  onToggleLocale,
 }: ExplorerTopBarProps) {
   const copy = EXPLORER_COPY[locale];
   const arcminLabel = formatFieldSizeArcmin(query.fieldSizeDeg);
@@ -172,54 +169,6 @@ export function ExplorerTopBar({
           <SiGithub size={EXPLORER_CONFIG.iconSizeSm} aria-hidden="true" />
           <span>{copy.github}</span>
         </a>
-
-        <div className="dropdown dropdown-end">
-          <button
-            type="button"
-            tabIndex={EXPLORER_CONFIG.firstIndex}
-            aria-label="Toggle language"
-            className="btn btn-ghost btn-sm gap-1 font-mono text-[length:var(--ae-text-sm)] text-[var(--ae-text-secondary)] hover:text-[var(--ae-text-primary)]"
-          >
-            <Globe size={EXPLORER_CONFIG.iconSizeSm} aria-hidden="true" />
-            <span>{locale.toUpperCase()}</span>
-            <ChevronDown size={EXPLORER_CONFIG.iconSizeSm} aria-hidden="true" />
-          </button>
-          <ul
-            tabIndex={EXPLORER_CONFIG.firstIndex}
-            className="menu dropdown-content z-30 mt-2 w-36 rounded-[var(--ae-radius-md)] border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-elevated)] p-1 shadow-xl"
-          >
-            <li>
-              <button
-                type="button"
-                className={
-                  locale === "en"
-                    ? "font-semibold text-[var(--ae-accent-primary)]"
-                    : "text-[var(--ae-text-secondary)]"
-                }
-                onClick={() => {
-                  if (locale !== "en") onToggleLocale();
-                }}
-              >
-                English (EN)
-              </button>
-            </li>
-            <li>
-              <button
-                type="button"
-                className={
-                  locale === "es"
-                    ? "font-semibold text-[var(--ae-accent-primary)]"
-                    : "text-[var(--ae-text-secondary)]"
-                }
-                onClick={() => {
-                  if (locale !== "es") onToggleLocale();
-                }}
-              >
-                Español (ES)
-              </button>
-            </li>
-          </ul>
-        </div>
       </div>
 
       {/* Mobile actions */}
@@ -281,11 +230,6 @@ export function ExplorerTopBar({
                 />
                 {copy.github}
               </a>
-            </li>
-            <li>
-              <button type="button" onClick={onToggleLocale}>
-                {locale === "en" ? "EN | ES" : "ES | EN"}
-              </button>
             </li>
           </ul>
         </div>

@@ -156,21 +156,6 @@ describe("ExplorerView", () => {
     expect(within(timeline).getByText("5 / 8")).toBeInTheDocument();
   });
 
-  it("switches language between EN and ES", () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(null, { status: 404 })
-    );
-
-    render(<ExplorerView query={SAMPLE_QUERY} onBackToPortal={vi.fn()} />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Toggle language" }));
-    fireEvent.click(screen.getByRole("button", { name: "Español (ES)" }));
-    expect(
-      screen.getByRole("heading", { name: "Comparar" })
-    ).toBeInTheDocument();
-    expect(screen.getByText("Línea de tiempo")).toBeInTheDocument();
-  });
-
   it("toggles between 2D and 3D views and toggles 3D sky overlays", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(null, { status: 404 })
