@@ -1,11 +1,14 @@
 from datetime import date
 import logging
+from dataclasses import dataclass
 
 import numpy as np
 from astropy.table import Table
 from astropy.time import Time
 from astropy.utils.data import conf
+from astropy.wcs import WCS
 from services.cache import TTLCache
+from services.fits_remote import RemoteFitsError
 from services.image_renderer import _download_fits_image, render_image_png
 
 from services.irsa_archive import ArchiveUnavailableError, search_images
@@ -15,6 +18,9 @@ logger = logging.getLogger(__name__)
 
 PNG_CACHE = TTLCache(ttl_s=3600, max_items=32)
 FITS_CACHE = TTLCache(ttl_s=3600, max_items=32)
+# WCS + shape of rendered cutouts, filled as a by-product of rendering so the
+# spectrum endpoint never has to re-download a frame just to map a click.
+FRAME_GEOMETRY_CACHE = TTLCache(ttl_s=3600, max_items=64)
 
 DETECTOR_WAVELENGTHS_UM = {
     1: (0.75, 1.11),
@@ -28,6 +34,22 @@ DETECTOR_WAVELENGTHS_UM = {
 
 class ImageNotFoundError(Exception):
     pass
+
+
+@dataclass(frozen=True)
+class FrameGeometry:
+    wcs: WCS  # celestial WCS of the rendered cutout
+    shape: tuple[int, int]  # (ny, nx) of the rendered cutout
+
+
+def frame_geometry_key(ra_deg: float, dec_deg: float, observation_date: date, size_deg: float):
+    return (round(ra_deg, 5), round(dec_deg, 5), observation_date, size_deg)
+
+
+def remember_frame_geometry(key, image_data: np.ndarray, wcs: WCS) -> None:
+    if wcs.has_celestial:
+        geometry = FrameGeometry(wcs.celestial, tuple(int(n) for n in image_data.shape[-2:]))
+        FRAME_GEOMETRY_CACHE.get_or_compute(key, lambda: geometry)
 
 
 def _rows_on_date(table: Table, observation_date: date) -> np.ndarray:
@@ -165,6 +187,7 @@ def _render_png(
     size_deg: float = 0.05,
     color: str = "magma",
     bands: tuple[int, ...] | None = None,
+    geometry_key=None,
 ) -> bytes:
     try:
         coords = {"ra": ra_deg, "dec": dec_deg}
@@ -177,12 +200,20 @@ def _render_png(
             color=color,
             bands=bands,
             size=None,
-            image_loader=lambda source: _download_render_image(
-                source, ra_deg, dec_deg, size_deg
-            ),
+            image_loader=_render_loader(ra_deg, dec_deg, size_deg, geometry_key),
         )
-    except OSError as exc:
+    except (OSError, RemoteFitsError) as exc:
         raise ArchiveUnavailableError("Image download failed.") from exc
+
+
+def _render_loader(ra_deg, dec_deg, size_deg, geometry_key):
+    def load(source):
+        image_data, wcs = _download_render_image(source, ra_deg, dec_deg, size_deg)
+        if geometry_key is not None:
+            remember_frame_geometry(geometry_key, image_data, wcs)
+        return image_data, wcs
+
+    return load
 
 
 def _download_render_image(fits_url, ra_deg, dec_deg, size_deg):
@@ -208,6 +239,7 @@ def get_sky_image_png(
     )
 
     def compute():
+        geometry_key = frame_geometry_key(ra_deg, dec_deg, observation_date, size_deg)
         table = search_images(ra_deg, dec_deg)
         selected_detectors = requested_detectors
         if detectors is None and len(requested_detectors or ()) == 1:
@@ -237,13 +269,11 @@ def get_sky_image_png(
                     color=color,
                     bands=selected_detectors,
                     size=None,
-                    image_loader=lambda source: _download_render_image(
-                        source, ra_deg, dec_deg, size_deg
-                    ),
+                    image_loader=_render_loader(ra_deg, dec_deg, size_deg, geometry_key),
                 )
-            except OSError as exc:
+            except (OSError, RemoteFitsError) as exc:
                 raise ArchiveUnavailableError("Image download failed.") from exc
         fits_url = _find_image_url(ra_deg, dec_deg, observation_date)
-        return _render_png(fits_url, ra_deg, dec_deg, size_deg, color)
+        return _render_png(fits_url, ra_deg, dec_deg, size_deg, color, geometry_key=geometry_key)
 
     return PNG_CACHE.get_or_compute(key, compute)

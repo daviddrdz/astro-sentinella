@@ -11,8 +11,10 @@ import type {
 
 export const EXPLORER_CONFIG = {
   framesEndpoint: "/api/frames",
+  spectrumEndpoint: "/api/frames/spectrum",
   compareEndpoint: "/api/frames/compare",
   compareMaxFrames: 2,
+  detectorRangeDecimals: 2,
   defaultArcminPerDeg: 60,
   defaultScaleArcmin: 5,
   playbackIntervalMs: 1200,
@@ -56,6 +58,11 @@ export const EXPLORER_TOOLS: readonly ToolOption[] = [
   },
   { id: "region", mobileVisible: false, label: { en: "Region", es: "Región" } },
   { id: "ruler", mobileVisible: false, label: { en: "Ruler", es: "Regla" } },
+  {
+    id: "spectrum",
+    mobileVisible: true,
+    label: { en: "Spectrum", es: "Espectro" },
+  },
   {
     id: "reset",
     mobileVisible: false,
@@ -139,6 +146,17 @@ export const EXPLORER_COPY: Record<
     loadingFrame: string;
     frameUnavailable: string;
     retryFrame: string;
+    spectrumTitle: string;
+    spectrumHint: string;
+    spectrumLoading: string;
+    spectrumError: string;
+    spectrumNoCoverage: string;
+    spectrumSourceNote: string;
+    spectrumWavelength: string;
+    spectrumFlux: string;
+    spectrumChunk: string;
+    spectrumShowTable: string;
+    spectrumClose: string;
     compareTitle: string;
     compareHint: string;
     frameALabel: string;
@@ -190,6 +208,19 @@ export const EXPLORER_COPY: Record<
     frameUnavailable:
       "Frame unavailable or rate-limited. Wait a moment and retry.",
     retryFrame: "Retry",
+    spectrumTitle: "Chunk spectrum",
+    spectrumHint:
+      "Click anywhere on the frame to see the spectrum of that area.",
+    spectrumLoading: "Extracting spectrum from the 102 SPHEREx channels...",
+    spectrumError: "Spectrum unavailable. Try again in a moment.",
+    spectrumNoCoverage: "No SPHEREx mosaic coverage for this area.",
+    spectrumSourceNote:
+      "All-mission SPHEREx mosaic (quick-look, not tied to this date). For science, use the IRSA spectrophotometry tool.",
+    spectrumWavelength: "Wavelength (µm)",
+    spectrumFlux: "Surface brightness",
+    spectrumChunk: "Chunk",
+    spectrumShowTable: "Show data table",
+    spectrumClose: "Close spectrum",
     compareTitle: "Compare",
     compareHint: "Select 2 frames from the timeline to subtract.",
     frameALabel: "Frame A",
@@ -240,6 +271,18 @@ export const EXPLORER_COPY: Record<
     frameUnavailable:
       "Fotograma no disponible o límite de peticiones alcanzado.",
     retryFrame: "Reintentar",
+    spectrumTitle: "Espectro del chunk",
+    spectrumHint: "Haz clic en el frame para ver el espectro de esa zona.",
+    spectrumLoading: "Extrayendo el espectro de los 102 canales SPHEREx...",
+    spectrumError: "Espectro no disponible. Intenta de nuevo en un momento.",
+    spectrumNoCoverage: "El mosaico SPHEREx no cubre esta zona.",
+    spectrumSourceNote:
+      "Mosaico SPHEREx de toda la misión (quick-look, no corresponde a esta fecha). Para ciencia, usa la herramienta de espectrofotometría de IRSA.",
+    spectrumWavelength: "Longitud de onda (µm)",
+    spectrumFlux: "Brillo superficial",
+    spectrumChunk: "Chunk",
+    spectrumShowTable: "Ver tabla de datos",
+    spectrumClose: "Cerrar espectro",
     compareTitle: "Comparar",
     compareHint: "Selecciona 2 fotogramas en la línea de tiempo para restar.",
     frameALabel: "Fotograma A",
@@ -345,3 +388,54 @@ export const DEFAULT_EXPLORER_FRAMES: readonly ExplorerFrame[] = [
     visible: true,
   },
 ];
+
+/** Geometry and styling of the inline spectrum chart (SVG user units). */
+export const SPECTRUM_CHART = {
+  width: 360,
+  height: 220,
+  margin: { top: 22, right: 12, bottom: 36, left: 52 },
+  xTicksUm: [1, 2, 3, 4, 5],
+  xDomainMinUm: 0.7,
+  xDomainMaxUm: 5.1,
+  yTickTarget: 4,
+  yPadRatio: 0.08,
+  yLabelGap: 6,
+  xLabelOffset: 14,
+  axisTitleInset: 4,
+  yTitleX: 11,
+  refLabelGap: 6,
+  lineWidth: 2,
+  markerRadius: 4,
+  markerRing: 2,
+  refLineOpacity: 0.35,
+  crosshairOpacity: 0.6,
+  coordDecimals: 1,
+  wavelengthDecimals: 3,
+  tooltipMinPct: 20,
+  tooltipMaxPct: 80,
+  percent: 100,
+  half: 2,
+  /** Common bright features in SPHEREx spectra, drawn as faint references. */
+  referenceLines: [
+    { um: 1.875, label: "Paα" },
+    { um: 3.3, label: "PAH" },
+    { um: 4.052, label: "Brα" },
+  ],
+} as const;
+
+export const SPECTRUM_FORMAT = {
+  fluxSignificantDigits: 3,
+  fluxExpDigits: 2,
+  fluxSmallAbs: 0.01,
+  fluxLargeAbs: 1e4,
+  niceResiduals: [
+    { atLeast: 7, nice: 10 },
+    { atLeast: 3, nice: 5 },
+    { atLeast: 1.5, nice: 2 },
+  ],
+  niceBase: 10,
+  tickPrecision: 12,
+  clickDecimals: 4,
+  coordDecimals: 4,
+  chunkArcsecDecimals: 0,
+} as const;

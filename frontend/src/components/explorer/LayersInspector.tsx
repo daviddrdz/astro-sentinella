@@ -1,6 +1,5 @@
 // import { Eye, EyeOff, GitMerge, Plus } from "lucide-react";
 import {
-  BAND_CHANNELS,
   // BLEND_MODES,
   CHANNEL_TINTS,
   EXPLORER_CONFIG,
