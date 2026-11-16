@@ -129,7 +129,7 @@ def test_rendering_records_frame_geometry(monkeypatch, tmp_path):
     w.wcs.cdelt = [-6.15 / 3600, 6.15 / 3600]
     path = tmp_path / "img.fits"
     fits.HDUList(
-        [fits.PrimaryHDU(), fits.ImageHDU(np.random.rand(16, 16), header=w.to_header())]
+        [fits.PrimaryHDU(), fits.ImageHDU(np.arange(256, dtype=np.float32).reshape(16, 16), header=w.to_header())]
     ).writeto(path)
     monkeypatch.setattr(frames_service, "search_images", lambda *_: Table({"t_min": []}))
     monkeypatch.setattr(frames_service, "_find_image_url", lambda *_: str(path))
@@ -149,7 +149,7 @@ def test_render_png_produces_png_bytes(monkeypatch, tmp_path):
     from astropy.io import fits
 
     path = tmp_path / "img.fits"
-    fits.HDUList([fits.PrimaryHDU(), fits.ImageHDU(np.random.rand(16, 16))]).writeto(path)
+    fits.HDUList([fits.PrimaryHDU(), fits.ImageHDU(np.arange(256, dtype=np.float32).reshape(16, 16))]).writeto(path)
 
     png = frames_service._render_png(str(path))
     assert png.startswith(b"\x89PNG")
@@ -164,7 +164,7 @@ def test_remote_fits_is_fetched_with_requests_not_astropy(monkeypatch):
     from services import image_renderer
 
     buf = io.BytesIO()
-    fits.HDUList([fits.PrimaryHDU(), fits.ImageHDU(np.random.rand(8, 8), name="IMAGE")]).writeto(buf)
+    fits.HDUList([fits.PrimaryHDU(), fits.ImageHDU(np.arange(64, dtype=np.float32).reshape(8, 8), name="IMAGE")]).writeto(buf)
     requested = []
 
     def fake_download(url):
@@ -192,6 +192,7 @@ def test_remote_fits_client_errors_become_archive_errors(monkeypatch):
 
     monkeypatch.setattr(image_renderer, "download", not_found)
     monkeypatch.setattr(frames_service, "_find_image_url", lambda *_: "https://irsa.test/f.fits")
+    monkeypatch.setattr(frames_service, "search_images", lambda *_: Table())
 
     with pytest.raises(ArchiveUnavailableError):
         frames_service.get_sky_image_png(1.0, 2.0, date(2025, 5, 1))
