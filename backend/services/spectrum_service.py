@@ -11,40 +11,41 @@ The HiPS cube is meant for visualization; for science use the IRSA SPHEREx
 spectrophotometry tool.
 """
 
+import logging
 import math
 import os
+import threading
 import warnings
 from dataclasses import dataclass
 from datetime import date
 
 import numpy as np
 import requests
-from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
 from matplotlib.path import Path
 
 from services import hips_cube
 from services.cache import TTLCache
-from services.frames_service import _find_image_url
+from services.frames_service import (
+    FRAME_GEOMETRY_CACHE,
+    FrameGeometry,
+    _find_image_url,
+    frame_geometry_key,
+)
 from services.image_renderer import _download_fits_image
 from services.irsa_archive import ArchiveUnavailableError
+
+logger = logging.getLogger(__name__)
 
 CHUNK_ARCSEC = float(os.environ.get("SPECTRUM_CHUNK_ARCSEC", "26"))  # ~2 HiPS cube pixels
 MAX_GRID = 32
 SPECTRUM_SOURCE = "SPHEREx DR1 HiPS cube (all-mission mosaic, quick-look)"
 
-FRAME_GEOMETRY_CACHE = TTLCache(ttl_s=3600, max_items=64)
 FIELD_CUBE_CACHE = TTLCache(ttl_s=3600, max_items=16)
 
 
 class SpectrumUnavailableError(Exception):
     pass
-
-
-@dataclass(frozen=True)
-class FrameGeometry:
-    wcs: WCS  # celestial WCS of the rendered cutout
-    shape: tuple[int, int]  # (ny, nx) of the rendered cutout
 
 
 @dataclass(frozen=True)
@@ -57,7 +58,11 @@ class ChunkGrid:
 def get_frame_geometry(
     ra_deg: float, dec_deg: float, observation_date: date, size_deg: float
 ) -> FrameGeometry:
-    """WCS and shape of the same cutout that /api/frames/image renders."""
+    """WCS and shape of the same cutout that /api/frames/image renders.
+
+    Normally already cached as a by-product of rendering; the download below is
+    only the fallback (e.g. after a restart).
+    """
 
     def compute():
         fits_url = _find_image_url(ra_deg, dec_deg, observation_date)
@@ -69,7 +74,7 @@ def get_frame_geometry(
             raise SpectrumUnavailableError("The frame has no sky coordinates.")
         return FrameGeometry(wcs.celestial, tuple(int(n) for n in data.shape[-2:]))
 
-    key = (round(ra_deg, 5), round(dec_deg, 5), observation_date, size_deg)
+    key = frame_geometry_key(ra_deg, dec_deg, observation_date, size_deg)
     return FRAME_GEOMETRY_CACHE.get_or_compute(key, compute)
 
 
@@ -87,6 +92,20 @@ def get_field_cube(ra_deg: float, dec_deg: float, size_deg: float) -> hips_cube.
 
     key = (round(ra_deg, 5), round(dec_deg, 5), size_deg)
     return FIELD_CUBE_CACHE.get_or_compute(key, compute)
+
+
+def prefetch_field_cube(ra_deg: float, dec_deg: float, size_deg: float) -> threading.Thread:
+    """Warm the field cube in the background so the first click is served from cache."""
+
+    def run():
+        try:
+            get_field_cube(ra_deg, dec_deg, size_deg)
+        except Exception:
+            logger.info("Field cube prefetch failed", exc_info=True)
+
+    thread = threading.Thread(target=run, name="field-cube-prefetch", daemon=True)
+    thread.start()
+    return thread
 
 
 def chunk_grid(geometry: FrameGeometry, chunk_arcsec: float = CHUNK_ARCSEC) -> ChunkGrid:

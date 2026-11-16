@@ -101,6 +101,46 @@ def test_image_route_hides_upstream_errors(client, monkeypatch):
     assert "secret" not in resp.get_data(as_text=True)
 
 
+def test_image_route_prefetches_field_cube_only_on_success(client, monkeypatch):
+    prefetches = []
+    monkeypatch.setattr("routes.frames.prefetch_field_cube", lambda *args: prefetches.append(args))
+    monkeypatch.setattr("routes.frames.get_sky_image_png", lambda *_, **__: b"\x89PNG")
+
+    client.get("/api/frames/image", query_string={**VALID_ARGS, "fieldSizeDeg": "0.1"})
+    assert prefetches == [(133.795, -7.2455, 0.1)]
+
+    def missing(*_, **__):
+        raise ImageNotFoundError("none")
+
+    monkeypatch.setattr("routes.frames.get_sky_image_png", missing)
+    client.get("/api/frames/image", query_string=VALID_ARGS)
+    assert len(prefetches) == 1
+
+
+def test_rendering_records_frame_geometry(monkeypatch, tmp_path):
+    import numpy as np
+    from astropy.io import fits
+    from astropy.wcs import WCS
+
+    w = WCS(naxis=2)
+    w.wcs.ctype = ["RA---TAN", "DEC--TAN"]
+    w.wcs.crval = [133.795, -7.2455]
+    w.wcs.crpix = [8.5, 8.5]
+    w.wcs.cdelt = [-6.15 / 3600, 6.15 / 3600]
+    path = tmp_path / "img.fits"
+    fits.HDUList(
+        [fits.PrimaryHDU(), fits.ImageHDU(np.random.rand(16, 16), header=w.to_header())]
+    ).writeto(path)
+    monkeypatch.setattr(frames_service, "_find_image_url", lambda *_: str(path))
+
+    frames_service.get_sky_image_png(133.795, -7.2455, date(2025, 5, 1), 0.05)
+
+    key = frames_service.frame_geometry_key(133.795, -7.2455, date(2025, 5, 1), 0.05)
+    geometry = frames_service.FRAME_GEOMETRY_CACHE.get_or_compute(key, lambda: None)
+    assert geometry.shape == (16, 16)
+    assert geometry.wcs.wcs.crval.tolist() == [133.795, -7.2455]
+
+
 def test_render_png_produces_png_bytes(monkeypatch, tmp_path):
     import numpy as np
     from astropy.io import fits

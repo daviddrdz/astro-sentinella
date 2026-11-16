@@ -115,3 +115,25 @@ def test_fetch_does_not_retry_client_errors(monkeypatch):
     with pytest.raises(RemoteFitsError):
         fits_remote.read_range(URL, 0, 10)
     assert len(calls) == 1
+
+
+@pytest.mark.parametrize(
+    "status, expectation",
+    [(200, fits_remote.RangeNotSupportedError), (416, b"")],
+)
+def test_fetch_range_semantics(monkeypatch, status, expectation):
+    class Resp:
+        status_code = status
+        headers = {}
+        content = b"whole file"
+
+    class Session:
+        def get(self, *args, **kwargs):
+            return Resp()
+
+    monkeypatch.setattr(fits_remote, "_session", Session())
+    if isinstance(expectation, bytes):
+        assert fits_remote.read_range(URL, 10**9, 10**9 + 1) == expectation
+    else:
+        with pytest.raises(expectation):
+            fits_remote.read_range(URL, 0, 10)

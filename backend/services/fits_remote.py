@@ -34,6 +34,10 @@ class RemoteFitsError(Exception):
     pass
 
 
+class RangeNotSupportedError(RemoteFitsError):
+    """The server answered a Range request with the whole file (HTTP 200)."""
+
+
 @dataclass(frozen=True)
 class HduInfo:
     name: str
@@ -59,6 +63,10 @@ def _fetch(url: str, start: int, end: int) -> tuple[bytes, int | None]:
         )
         if resp.status_code >= 500:
             raise requests.HTTPError(f"HTTP {resp.status_code}", response=resp)
+        if resp.status_code == 200:
+            raise RangeNotSupportedError(url)
+        if resp.status_code == 416:  # asked past the end of the file
+            return b"", None
         if resp.status_code != 206:
             raise RemoteFitsError(f"Range request failed with HTTP {resp.status_code}")
         content_range = resp.headers.get("Content-Range", "")

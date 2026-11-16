@@ -19,16 +19,21 @@ from dataclasses import dataclass
 import astropy.units as u
 import hpgeom
 import numpy as np
-import requests
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.table import Table
 from astropy.utils.data import download_file
 from astropy.wcs import WCS
 
+from services import fits_remote
+from services.cache import TTLCache
+from services.fits_remote import RangeNotSupportedError
+
+# The public S3 mirror of the IRSA archive: same keys, supports Range, and avoids
+# the IRSA proxy's sporadic 403/502s.
 HIPS_CUBE_DATA_URL = os.environ.get(
     "SPHEREX_HIPS_CUBE_URL",
-    "https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/hips5_cube/hips_20261026",
+    "https://nasa-irsa-spherex.s3.us-east-1.amazonaws.com/dr1/hips5_cube/hips_20261026",
 )
 HIPS_ORDER = 5
 FITS_BLOCK = 2880
@@ -37,16 +42,14 @@ HEADER_PROBE_BYTES = 10 * FITS_BLOCK
 MAX_HDUS = 16
 MAX_PARALLEL_RANGES = 16
 HTTP_TIMEOUT_S = 60
+# One order-5 tile (~1.8 deg) serves many explorer fields; its header layout never changes.
+SCAN_CACHE = TTLCache(ttl_s=6 * 3600, max_items=256)
 
 _BITPIX_DTYPES = {8: ">u1", 16: ">i2", 32: ">i4", 64: ">i8", -32: ">f4", -64: ">f8"}
 _CELESTIAL_EXTRA_KEYS = ("LONPOLE", "LATPOLE", "RADESYS", "EQUINOX", "MJD-OBS", "DATE-OBS")
 
 # (url, first_byte, last_byte_inclusive) -> bytes
 RangeFetcher = Callable[[str, int, int], bytes]
-
-
-class RangeNotSupportedError(Exception):
-    pass
 
 
 class OutsideTileError(Exception):
@@ -76,17 +79,9 @@ def tile_url(ra_deg: float, dec_deg: float, order: int = HIPS_ORDER) -> str:
     return f"{HIPS_CUBE_DATA_URL}/Norder{order}/Dir{dir_id}/Npix{ipix}_cube.fits"
 
 
-_session = requests.Session()
-
-
 def http_range_fetch(url: str, start: int, end: int) -> bytes:
-    resp = _session.get(url, headers={"Range": f"bytes={start}-{end}"}, timeout=HTTP_TIMEOUT_S)
-    if resp.status_code == 200:
-        raise RangeNotSupportedError(url)
-    if resp.status_code == 416:  # asked past the end of the file
-        return b""
-    resp.raise_for_status()
-    return resp.content
+    """Pooled, retrying range read; raises RangeNotSupportedError on a 200 reply."""
+    return fits_remote.read_range(url, start, end)
 
 
 def file_range_fetch(url: str, start: int, end: int) -> bytes:
@@ -124,18 +119,22 @@ def _data_size(header: fits.Header) -> int:
 
 def scan_hdus(url: str, fetch: RangeFetcher, wanted: set[str]) -> dict[str, HduInfo]:
     """Walk the MEF headers (skipping data) until every extension in ``wanted`` is found."""
-    found: dict[str, HduInfo] = {}
-    offset = 0
-    for index in range(MAX_HDUS):
-        header, raw = _read_header(url, fetch, offset)
-        name = str(header.get("EXTNAME", "PRIMARY" if index == 0 else "")).strip().upper()
-        data_offset = offset + len(raw)
-        if name in wanted:
-            found[name] = HduInfo(header, offset, data_offset, raw)
-            if wanted <= found.keys():
-                return found
-        offset = data_offset + _data_size(header)
-    raise OSError(f"FITS file is missing extensions: {sorted(wanted - found.keys())}")
+
+    def compute():
+        found: dict[str, HduInfo] = {}
+        offset = 0
+        for index in range(MAX_HDUS):
+            header, raw = _read_header(url, fetch, offset)
+            name = str(header.get("EXTNAME", "PRIMARY" if index == 0 else "")).strip().upper()
+            data_offset = offset + len(raw)
+            if name in wanted:
+                found[name] = HduInfo(header, offset, data_offset, raw)
+                if wanted <= found.keys():
+                    return found
+            offset = data_offset + _data_size(header)
+        raise OSError(f"FITS file is missing extensions: {sorted(wanted - found.keys())}")
+
+    return SCAN_CACHE.get_or_compute((url, frozenset(wanted)), compute)
 
 
 def read_cube_rows(

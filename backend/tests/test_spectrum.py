@@ -134,6 +134,7 @@ def test_reads_only_the_requested_rows(cube_file):
         return hips_cube.file_range_fetch(url, start, end)
 
     hdus = hips_cube.scan_hdus(cube_file, counting_fetch, {"IMAGE", "SPECTRAL_CHANNELS"})
+    header_reads = len(fetched)
     fetched.clear()
     region = hips_cube.read_cube_rows(cube_file, counting_fetch, hdus["IMAGE"], 10, 15, 20, 26)
 
@@ -143,6 +144,11 @@ def test_reads_only_the_requested_rows(cube_file):
         assert fetched == [5 * CUBE_NPIX * 4] * N_CHANNELS
         table = hips_cube.read_table(cube_file, hips_cube.file_range_fetch, hdus["SPECTRAL_CHANNELS"])
         assert list(table["WAVELENGTH"]) == list(hdul["SPECTRAL_CHANNELS"].data["WAVELENGTH"])
+
+    # A second field on the same tile reuses the header scan.
+    fetched.clear()
+    assert hips_cube.scan_hdus(cube_file, counting_fetch, {"IMAGE", "SPECTRAL_CHANNELS"}) is hdus
+    assert header_reads > 0 and fetched == []
 
 
 def test_celestial_wcs_ignores_spectral_tab_axis():
@@ -232,6 +238,44 @@ def test_cube_download_errors_become_archive_errors(monkeypatch):
     monkeypatch.setattr(hips_cube, "load_field_cube", boom)
     with pytest.raises(ArchiveUnavailableError):
         spectrum_service.get_field_cube(RA, DEC, 0.05)
+
+
+def test_frame_geometry_recorded_by_rendering_is_reused(monkeypatch, frame_geometry):
+    from services import frames_service
+
+    def no_download(*a, **k):
+        pytest.fail("geometry should come from the render-time cache")
+
+    monkeypatch.setattr(spectrum_service, "_download_fits_image", no_download)
+    monkeypatch.setattr(spectrum_service, "_find_image_url", no_download)
+    key = frames_service.frame_geometry_key(RA, DEC, date(2025, 5, 1), 0.05)
+    frames_service.remember_frame_geometry(
+        key, np.zeros(frame_geometry.shape, dtype=np.float32), frame_geometry.wcs
+    )
+
+    geometry = spectrum_service.get_frame_geometry(RA, DEC, date(2025, 5, 1), 0.05)
+    assert geometry.shape == frame_geometry.shape
+
+
+def test_prefetch_field_cube_warms_cache_in_background(wired):
+    thread = spectrum_service.prefetch_field_cube(RA, DEC, 0.05)
+    thread.join(timeout=10)
+
+    assert not thread.is_alive()
+    cube = spectrum_service.FIELD_CUBE_CACHE.get_or_compute(
+        (round(RA, 5), round(DEC, 5), 0.05), lambda: pytest.fail("cube was not prefetched")
+    )
+    assert cube.data.shape[0] == N_CHANNELS
+
+
+def test_prefetch_failures_are_swallowed(monkeypatch):
+    def boom(*a, **k):
+        raise OSError("network down")
+
+    monkeypatch.setattr(hips_cube, "load_field_cube", boom)
+    thread = spectrum_service.prefetch_field_cube(RA, DEC, 0.05)
+    thread.join(timeout=10)
+    assert not thread.is_alive()
 
 
 # --- route -------------------------------------------------------------------
