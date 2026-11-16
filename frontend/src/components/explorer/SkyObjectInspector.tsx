@@ -8,11 +8,17 @@ import {
 } from "../../config/sky3dCatalog";
 import type { ExplorerLocale } from "../../types/explorer";
 import type { QueryParams } from "../../types/portal";
+import {
+  angularSeparationDeg,
+  formatAngularSeparation,
+} from "../../utils/frameMetrics";
 
 interface SkyObjectInspectorProps {
   query: QueryParams;
   locale: ExplorerLocale;
   selectedObject: SkyObjectDetails | null;
+  measureAnchor?: SkyObjectDetails | null;
+  onSetMeasureAnchor?: (obj: SkyObjectDetails | null) => void;
   onClearSelection: () => void;
   onSelectTarget: (target: Sky3DTarget) => void;
   onCenterObject: (obj: SkyObjectDetails) => void;
@@ -23,12 +29,35 @@ export function SkyObjectInspector({
   query,
   locale,
   selectedObject,
+  measureAnchor = null,
+  onSetMeasureAnchor,
   onClearSelection,
   onSelectTarget,
   onCenterObject,
   onSyncToQuery,
 }: SkyObjectInspectorProps) {
   const copy = SKY_3D_COPY[locale];
+  const hasMeasurementPair =
+    measureAnchor && selectedObject && measureAnchor.id !== selectedObject.id;
+  const sepDeg = hasMeasurementPair
+    ? angularSeparationDeg(
+        measureAnchor.raDeg,
+        measureAnchor.decDeg,
+        selectedObject.raDeg,
+        selectedObject.decDeg
+      )
+    : null;
+  const distLy3D =
+    hasMeasurementPair && sepDeg !== null
+      ? (() => {
+          const d1 = measureAnchor.distPc * SKY3D_CONSTANTS.pcToLy;
+          const d2 = selectedObject.distPc * SKY3D_CONSTANTS.pcToLy;
+          const cosTheta = Math.cos(sepDeg * SKY3D_CONSTANTS.degToRad);
+          return Math.sqrt(
+            Math.max(0, d1 * d1 + d2 * d2 - R.two * d1 * d2 * cosTheta)
+          );
+        })()
+      : null;
 
   return (
     <section
@@ -129,6 +158,61 @@ export function SkyObjectInspector({
               {copy.syncTo2D3D}
             </button>
           </div>
+          {onSetMeasureAnchor && (
+            <button
+              type="button"
+              onClick={() => onSetMeasureAnchor(selectedObject)}
+              className="mt-2 w-full rounded-[var(--ae-radius-sm)] border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-elevated)] px-2.5 py-1 text-[length:var(--ae-text-sm)] font-medium text-[var(--ae-text-secondary)] transition hover:border-[var(--ae-border-strong)] hover:text-[var(--ae-text-primary)]"
+            >
+              {copy.measureFromHere}
+            </button>
+          )}
+        </div>
+      )}
+
+      {measureAnchor && (
+        <div
+          data-testid="sky-measurement-card"
+          className="mb-3 rounded-[var(--ae-radius-md)] border border-[var(--ae-border-strong)] bg-[var(--ae-bg-elevated)] p-2.5 text-[length:var(--ae-text-sm)]"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-medium text-[var(--ae-text-primary)]">
+              {measureAnchor.name}
+            </span>
+            {onSetMeasureAnchor && (
+              <button
+                type="button"
+                onClick={() => onSetMeasureAnchor(null)}
+                className="text-xs text-[var(--ae-text-muted)] hover:text-[var(--ae-text-primary)]"
+              >
+                {copy.measureClear}
+              </button>
+            )}
+          </div>
+          {hasMeasurementPair && sepDeg !== null ? (
+            <dl className="mt-1.5 space-y-1 font-mono text-xs text-[var(--ae-text-secondary)]">
+              <div className="flex justify-between gap-2">
+                <dt className="text-[var(--ae-text-muted)]">
+                  {copy.angularSeparationLabel}
+                </dt>
+                <dd className="text-[var(--ae-accent-primary)]">
+                  {formatAngularSeparation(sepDeg)}
+                </dd>
+              </div>
+              {distLy3D !== null && (
+                <div className="flex justify-between gap-2">
+                  <dt className="text-[var(--ae-text-muted)]">
+                    {copy.physicalDistanceLabel}
+                  </dt>
+                  <dd>{Math.round(distLy3D).toLocaleString()} ly</dd>
+                </div>
+              )}
+            </dl>
+          ) : (
+            <p className="mt-1 text-xs text-[var(--ae-text-muted)]">
+              {copy.measureSelectSecond}
+            </p>
+          )}
         </div>
       )}
 

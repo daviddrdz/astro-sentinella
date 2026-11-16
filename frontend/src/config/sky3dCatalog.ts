@@ -833,6 +833,11 @@ export const SKY_3D_COPY: Record<
     syncedLabel: string;
     featuredTargetsTitle: string;
     activeRegionTitle: string;
+    measureFromHere: string;
+    measureSelectSecond: string;
+    measureClear: string;
+    angularSeparationLabel: string;
+    physicalDistanceLabel: string;
   }
 > = {
   en: {
@@ -876,6 +881,11 @@ export const SKY_3D_COPY: Record<
     syncedLabel: "Active region",
     featuredTargetsTitle: "SPHEREx Targets",
     activeRegionTitle: "Shared Coordinates",
+    measureFromHere: "Measure from here",
+    measureSelectSecond: "Select a second celestial object in 3D...",
+    measureClear: "Clear",
+    angularSeparationLabel: "Angular sep.",
+    physicalDistanceLabel: "3D distance",
   },
   es: {
     overlays: {
@@ -918,5 +928,10 @@ export const SKY_3D_COPY: Record<
     syncedLabel: "Región activa",
     featuredTargetsTitle: "Objetivos SPHEREx",
     activeRegionTitle: "Coordenadas compartidas",
+    measureFromHere: "Medir desde aquí",
+    measureSelectSecond: "Selecciona un segundo astro en 3D...",
+    measureClear: "Limpiar",
+    angularSeparationLabel: "Sep. angular",
+    physicalDistanceLabel: "Distancia 3D",
   },
 };

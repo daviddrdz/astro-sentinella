@@ -179,6 +179,18 @@ export const EXPLORER_COPY: Record<
     compareSelectingHint: string;
     view2D: string;
     view3D: string;
+    metricDeltaMean: string;
+    metricMaxDiff: string;
+    metricRms: string;
+    metricChanged: string;
+    spectrumPinRef: string;
+    spectrumClearRef: string;
+    spectrumCompareHeader: string;
+    spectrumRefA: string;
+    spectrumCurrentB: string;
+    spectrumDelta: string;
+    rulerHint: string;
+    rulerSeparation: string;
   }
 > = {
   en: {
@@ -245,6 +257,18 @@ export const EXPLORER_COPY: Record<
     compareSelectingHint: "Click 2 frames in the timeline to select them.",
     view2D: "2D",
     view3D: "3D",
+    metricDeltaMean: "Mean Δ",
+    metricMaxDiff: "Peak Δ",
+    metricRms: "RMS",
+    metricChanged: "Changed",
+    spectrumPinRef: "Pin as Ref A",
+    spectrumClearRef: "Clear Ref A",
+    spectrumCompareHeader: "Spectrum A vs B",
+    spectrumRefA: "Ref A peak",
+    spectrumCurrentB: "Current B peak",
+    spectrumDelta: "Δ Peak (B - A)",
+    rulerHint: "Click two points on the image to measure angular separation.",
+    rulerSeparation: "Separation",
   },
   es: {
     backToPortal: "Volver al Portal",
@@ -310,6 +334,18 @@ export const EXPLORER_COPY: Record<
       "Haz clic en 2 fotogramas de la línea de tiempo para seleccionarlos.",
     view2D: "2D",
     view3D: "3D",
+    metricDeltaMean: "Δ Media",
+    metricMaxDiff: "Pico Δ",
+    metricRms: "RMS",
+    metricChanged: "Cambio",
+    spectrumPinRef: "Fijar Ref A",
+    spectrumClearRef: "Quitar Ref A",
+    spectrumCompareHeader: "Espectro A vs B",
+    spectrumRefA: "Pico Ref A",
+    spectrumCurrentB: "Pico actual B",
+    spectrumDelta: "Δ Pico (B - A)",
+    rulerHint: "Haz clic en dos puntos para medir la separación angular.",
+    rulerSeparation: "Separación",
   },
 };
 

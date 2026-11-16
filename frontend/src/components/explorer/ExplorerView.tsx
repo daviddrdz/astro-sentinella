@@ -21,6 +21,7 @@ import {
   fetchChunkSpectrum,
   SpectrumRequestError,
 } from "../../services/spectrumService";
+import { computeFrameComparisonMetrics } from "../../utils/frameMetrics";
 import type {
   BandChannelId,
   ExplorerFrame,
@@ -110,6 +111,9 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
   const activeQuery = queryOverride ?? query;
   const [selectedSkyObject, setSelectedSkyObject] =
     useState<SkyObjectDetails | null>(null);
+  const [measureAnchor, setMeasureAnchor] = useState<SkyObjectDetails | null>(
+    null
+  );
   const [centerRequest, setCenterRequest] = useState<Center3DRequest | null>(
     null
   );
@@ -532,6 +536,9 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
     setCompareFrameIds([]);
 
     const result = await requestFrameComparison(activeQuery, frameA, frameB);
+    const metrics = result.ok
+      ? await computeFrameComparisonMetrics(frameA.imageUrl, frameB.imageUrl)
+      : null;
     setRestas((prev) =>
       prev.map((item) =>
         item.id === restaId
@@ -541,6 +548,7 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
                 status: "ready",
                 imageUrl: result.imageUrl,
                 summary: result.summary,
+                metrics,
               }
             : {
                 ...item,
@@ -670,6 +678,8 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
               query={activeQuery}
               locale={locale}
               selectedObject={selectedSkyObject}
+              measureAnchor={measureAnchor}
+              onSetMeasureAnchor={setMeasureAnchor}
               onClearSelection={() => setSelectedSkyObject(null)}
               onSelectTarget={handleSelectFeaturedTarget}
               onCenterObject={handleCenterSkyObject}

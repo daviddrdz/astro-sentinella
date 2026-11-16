@@ -281,4 +281,30 @@ describe("ExplorerView", () => {
       "18:50Z | 1"
     );
   });
+
+  it("measures angular and 3D separation between two celestial objects in 3D inspector", () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(null, { status: 404 })
+    );
+
+    render(<ExplorerView query={SAMPLE_QUERY} onBackToPortal={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "3D" }));
+    const inspector = screen.getByTestId("sky-object-inspector");
+
+    fireEvent.click(
+      within(inspector).getByRole("button", { name: "WISE 0855" })
+    );
+    fireEvent.click(
+      within(inspector).getByRole("button", { name: "Measure from here" })
+    );
+    fireEvent.click(
+      within(inspector).getByRole("button", { name: "Barnard's Star" })
+    );
+
+    const card = screen.getByTestId("sky-measurement-card");
+    expect(card).toHaveTextContent("WISE 0855");
+    expect(card).toHaveTextContent("°");
+    expect(card).toHaveTextContent("ly");
+  });
 });
