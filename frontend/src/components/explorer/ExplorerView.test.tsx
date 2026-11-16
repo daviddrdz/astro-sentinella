@@ -308,7 +308,7 @@ describe("ExplorerView", () => {
     expect(card).toHaveTextContent("ly");
   });
 
-  it("shows surrounding sky sectors up to a 5x5 matrix in 2D when zooming out", () => {
+  it("keeps surrounding sky sectors visible across zoom levels up to a 5x5 matrix in 2D", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(null, { status: 404 })
     );
@@ -316,13 +316,14 @@ describe("ExplorerView", () => {
     render(<ExplorerView query={SAMPLE_QUERY} onBackToPortal={vi.fn()} />);
 
     const viewport = screen.getByRole("region", { name: "Telescope viewport" });
-    expect(screen.queryByTestId("surrounding-sectors")).not.toBeInTheDocument();
-
-    fireEvent.wheel(viewport, { deltaY: 200 });
     expect(screen.getByTestId("surrounding-sectors")).toBeInTheDocument();
     expect(screen.getByTestId("sector-warning--1:-1")).toBeInTheDocument();
 
-    fireEvent.wheel(viewport, { deltaY: 400 });
+    fireEvent.wheel(viewport, { deltaY: 200 });
     expect(screen.getByTestId("sector-warning--2:-2")).toBeInTheDocument();
+
+    fireEvent.wheel(viewport, { deltaY: -400 });
+    expect(screen.getByTestId("surrounding-sectors")).toBeInTheDocument();
+    expect(screen.getByTestId("sector-warning--1:-1")).toBeInTheDocument();
   });
 });

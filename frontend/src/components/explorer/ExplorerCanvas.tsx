@@ -29,8 +29,7 @@ const DEFAULT_FIELD_SIZE_DEG = 0.5;
 const RULER_MAX_POINTS = 2;
 const RULER_HALF = 0.5;
 const RULER_PCT = 100;
-const ZOOM_OUT_TILES_THRESHOLD = 0.92;
-const ZOOM_OUT_OUTER_RING_THRESHOLD = 0.65;
+const ZOOM_OUT_OUTER_RING_THRESHOLD = 0.92;
 const TILE_OUTER_RADIUS = 2;
 const TILE_OFFSETS = [-TILE_OUTER_RADIUS, -1, 0, 1, TILE_OUTER_RADIUS] as const;
 const TILE_INNER_RADIUS = 1;
@@ -170,7 +169,7 @@ export function ExplorerCanvas({
     Record<string, "loading" | "loaded" | "error">
   >({});
 
-  const showSurroundingSectors = zoomLevel < ZOOM_OUT_TILES_THRESHOLD;
+  const showSurroundingSectors = !activeSubtraction;
 
   // Unscaled layout size of the frame box; the zoom transform is applied on top.
   useEffect(() => {
