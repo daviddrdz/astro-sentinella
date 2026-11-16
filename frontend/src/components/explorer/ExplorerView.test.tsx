@@ -283,4 +283,26 @@ describe("ExplorerView", () => {
     ).not.toBeInTheDocument();
     expect(screen.getAllByText(/08h 55m 10\.831s/).length).toBeGreaterThan(0);
   });
+
+  it("updates the active frame in 3D view when stepping the timeline player", () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(null, { status: 404 })
+    );
+
+    render(<ExplorerView query={SAMPLE_QUERY} onBackToPortal={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "3D" }));
+    expect(screen.getByTestId("hud-active-frame")).toHaveTextContent(
+      "18:40Z | 1"
+    );
+
+    const timeline = screen.getByRole("region", { name: "Timeline" });
+    fireEvent.click(
+      within(timeline).getByRole("button", { name: "Next frame" })
+    );
+
+    expect(screen.getByTestId("hud-active-frame")).toHaveTextContent(
+      "18:50Z | 1"
+    );
+  });
 });

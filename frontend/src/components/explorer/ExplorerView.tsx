@@ -8,6 +8,8 @@ import {
   type BandChannelOption,
 } from "../../config/explorer";
 import {
+  parseSexagesimalDecDeg,
+  parseSexagesimalRaDeg,
   SKY3D_CONSTANTS,
   type Sky3DScaleId,
   type Sky3DTarget,
@@ -360,6 +362,12 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
         x: EXPLORER_CONFIG.firstIndex,
         y: EXPLORER_CONFIG.firstIndex,
       });
+      setCenterRequest((prev) => ({
+        raDeg: parseSexagesimalRaDeg(activeQuery.ra),
+        decDeg: parseSexagesimalDecDeg(activeQuery.dec),
+        fovDeg: SKY3D_CONSTANTS.defaultFovDeg,
+        nonce: (prev?.nonce ?? 0) + 1,
+      }));
       setActiveTool("hand");
       return;
     }
@@ -617,6 +625,7 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
         {viewMode === "3d" ? (
           <Explorer3DCanvas
             query={activeQuery}
+            layers={layers}
             activeFrame={activeFrame}
             activeSubtraction={activeSubtraction}
             locale={locale}

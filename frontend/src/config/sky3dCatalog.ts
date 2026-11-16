@@ -226,6 +226,7 @@ export const SKY3D_RENDER_CONSTANTS = {
   tooltipOffsetY: 12,
   rgbScale: 255,
   namedStarMatchToleranceDeg: 0.12,
+  percentDivisor: 100,
 } as const;
 
 export const PLANETS_J2000: readonly PlanetDefinition[] = [

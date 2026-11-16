@@ -23,11 +23,22 @@ import {
   type SkyObjectDetails,
 } from "../../config/sky3dCatalog";
 import type {
+  ChannelTintId,
   ExplorerFrame,
+  ExplorerLayer,
   ExplorerLocale,
   SubtractionResult,
 } from "../../types/explorer";
 import type { QueryParams } from "../../types/portal";
+
+const TINT_HEX: Record<ChannelTintId, string> = {
+  grey: "#94A3B8",
+  viridis: "#21918C",
+  magma: "#B5367A",
+  inferno: "#F98E09",
+  cividis: "#7C8770",
+  cubehelix: "#6890C8",
+};
 
 export interface Center3DRequest {
   raDeg: number;
@@ -38,6 +49,7 @@ export interface Center3DRequest {
 
 interface Explorer3DCanvasProps {
   query: QueryParams;
+  layers?: ExplorerLayer[];
   activeFrame: ExplorerFrame | null;
   activeSubtraction?: SubtractionResult | null;
   locale: ExplorerLocale;
@@ -611,6 +623,7 @@ function createSolarSystemGroup(): THREE.Group {
 
 export function Explorer3DCanvas({
   query,
+  layers = [],
   activeFrame,
   activeSubtraction,
   locale,
@@ -641,6 +654,27 @@ export function Explorer3DCanvas({
   const [hudFov, setHudFov] = useState<number>(SKY3D_CONSTANTS.defaultFovDeg);
   const [projectedLabels, setProjectedLabels] = useState<ProjectedLabel[]>([]);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const scaleRef = useRef<Sky3DScaleId>(scale);
+  const localeRef = useRef<ExplorerLocale>(locale);
+  const scaleGroupsRef = useRef<{
+    skyGroup: THREE.Group;
+    neighborhoodGroup: THREE.Group;
+    milkyWayGroup: THREE.Group;
+    solarSystemGroup: THREE.Group;
+  } | null>(null);
+  const reticleGroupRef = useRef<THREE.Group | null>(null);
+  const cutoutMatRef = useRef<THREE.MeshBasicMaterial | null>(null);
+  const cutoutBorderMatRef = useRef<THREE.LineBasicMaterial | null>(null);
+  const cutoutTextureRef = useRef<THREE.Texture | null>(null);
+  const cutoutBaseSizeRef = useRef<number>(1);
+
+  useEffect(() => {
+    scaleRef.current = scale;
+  }, [scale]);
+
+  useEffect(() => {
+    localeRef.current = locale;
+  }, [locale]);
 
   const targetRaDeg = useMemo(
     () => parseSexagesimalRaDeg(query.ra),
@@ -814,24 +848,22 @@ export function Explorer3DCanvas({
       skyGroup.add(skyStarsPoints);
     }
 
-    const fieldDeg = Math.max(
-      SKY3D_CONSTANTS.skyCutoutMinAngularSizeDeg,
-      Number(query.fieldSizeDeg) || SKY3D_CONSTANTS.skyCutoutMinAngularSizeDeg
-    );
-    const angularRad = fieldDeg * SKY3D_CONSTANTS.degToRad;
-    const planeSize =
+    const angularRad =
+      SKY3D_CONSTANTS.skyCutoutMinAngularSizeDeg * SKY3D_CONSTANTS.degToRad;
+    const basePlaneSize =
       R.two * SKY3D_CONSTANTS.skyCutoutDistance * Math.tan(angularRad * R.half);
-    const [cx, cy, cz] = equatorialToCartesian(
-      targetRaDeg,
-      targetDecDeg,
-      SKY3D_CONSTANTS.skyCutoutDistance
-    );
+    cutoutBaseSizeRef.current = basePlaneSize;
 
     const reticleGroup = new THREE.Group();
+    const [cx, cy, cz] = equatorialToCartesian(
+      0,
+      0,
+      SKY3D_CONSTANTS.skyCutoutDistance
+    );
     reticleGroup.position.set(cx, cy, cz);
     reticleGroup.lookAt(0, 0, 0);
 
-    const halfSize = planeSize * R.half;
+    const halfSize = basePlaneSize * R.half;
     const borderPts = [
       new THREE.Vector3(-halfSize, -halfSize, R.cutoutReticleZOffset),
       new THREE.Vector3(halfSize, -halfSize, R.cutoutReticleZOffset),
@@ -841,40 +873,44 @@ export function Explorer3DCanvas({
     ];
     const borderGeo = new THREE.BufferGeometry().setFromPoints(borderPts);
     const borderMat = new THREE.LineBasicMaterial({
-      color: activeSubtraction ? R.reticleSubtractHex : R.losColorHex,
+      color: R.losColorHex,
       transparent: true,
       opacity: R.reticleOpacity,
     });
     reticleGroup.add(new THREE.Line(borderGeo, borderMat));
 
-    let cutoutTexture: THREE.Texture | null = null;
-    if (cutoutImageUrl) {
-      const loader = new THREE.TextureLoader();
-      loader.setCrossOrigin("anonymous");
-      cutoutTexture = loader.load(cutoutImageUrl, (tex) => {
-        tex.colorSpace = THREE.SRGBColorSpace;
-      });
-      const cutoutGeo = new THREE.PlaneGeometry(planeSize, planeSize);
-      const cutoutMat = new THREE.MeshBasicMaterial({
-        map: cutoutTexture,
-        transparent: true,
-        opacity: R.cutoutMeshOpacity,
-        side: THREE.DoubleSide,
-      });
-      reticleGroup.add(new THREE.Mesh(cutoutGeo, cutoutMat));
-    }
+    const cutoutGeo = new THREE.PlaneGeometry(basePlaneSize, basePlaneSize);
+    const cutoutMat = new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: R.cutoutMeshOpacity,
+      side: THREE.DoubleSide,
+      visible: false,
+    });
+    reticleGroup.add(new THREE.Mesh(cutoutGeo, cutoutMat));
     skyGroup.add(reticleGroup);
 
+    reticleGroupRef.current = reticleGroup;
+    cutoutMatRef.current = cutoutMat;
+    cutoutBorderMatRef.current = borderMat;
+
     const neighborhoodGroup = hygData
-      ? createNeighborhoodGroup(hygData, targetRaDeg, targetDecDeg)
+      ? createNeighborhoodGroup(hygData, 0, 0)
       : new THREE.Group();
     const milkyWayGroup = createMilkyWayGroup();
     const solarSystemGroup = createSolarSystemGroup();
 
-    skyGroup.visible = scale === "sky-view";
-    neighborhoodGroup.visible = scale === "neighborhood";
-    milkyWayGroup.visible = scale === "milky-way";
-    solarSystemGroup.visible = scale === "solar-system";
+    const activeScale = scaleRef.current;
+    skyGroup.visible = activeScale === "sky-view";
+    neighborhoodGroup.visible = activeScale === "neighborhood";
+    milkyWayGroup.visible = activeScale === "milky-way";
+    solarSystemGroup.visible = activeScale === "solar-system";
+
+    scaleGroupsRef.current = {
+      skyGroup,
+      neighborhoodGroup,
+      milkyWayGroup,
+      solarSystemGroup,
+    };
 
     scene.add(skyGroup);
     scene.add(neighborhoodGroup);
@@ -910,7 +946,7 @@ export function Explorer3DCanvas({
         camera.updateProjectionMatrix();
       }
 
-      if (scale === "sky-view") {
+      if (scaleRef.current === "sky-view") {
         camera.position.set(0, 0, 0);
         const dirX = Math.cos(st.pitch) * Math.sin(st.yaw);
         const dirY = Math.sin(st.pitch);
@@ -961,7 +997,11 @@ export function Explorer3DCanvas({
           labels.push({ ...item, x: sx, y: sy });
         };
 
-        if (scale === "sky-view") {
+        const curScale = scaleRef.current;
+        const curLocale = localeRef.current;
+        const curCopy = SKY_3D_COPY[curLocale];
+
+        if (curScale === "sky-view") {
           for (const target of SPHEREX_3D_TARGETS) {
             const [tx, ty, tz] = equatorialToCartesian(
               target.raDeg,
@@ -994,11 +1034,11 @@ export function Explorer3DCanvas({
               if (labels.length > before) starCount += 1;
             }
           }
-        } else if (scale === "neighborhood") {
+        } else if (curScale === "neighborhood") {
           pushLabel(0, 0, 0, {
             id: "sun-here",
-            label: copy.sunLabel,
-            sublabel: copy.youAreHere,
+            label: curCopy.sunLabel,
+            sublabel: curCopy.youAreHere,
             kind: "landmark",
           });
           for (const target of SPHEREX_3D_TARGETS) {
@@ -1018,31 +1058,31 @@ export function Explorer3DCanvas({
               target,
             });
           }
-        } else if (scale === "milky-way") {
+        } else if (curScale === "milky-way") {
           pushLabel(0, 0, 0, {
             id: "gc",
-            label: copy.galacticCenter,
+            label: curCopy.galacticCenter,
             kind: "landmark",
           });
           pushLabel(SKY3D_CONSTANTS.milkyWaySunRadiusKpc, 0, 0, {
             id: "sun-mw",
-            label: copy.sunLabel,
-            sublabel: copy.youAreHere,
+            label: curCopy.sunLabel,
+            sublabel: curCopy.youAreHere,
             kind: "landmark",
           });
-        } else if (scale === "solar-system") {
+        } else if (curScale === "solar-system") {
           const nowMs = Date.now();
           pushLabel(0, 0, 0, {
             id: "sun-ss",
-            label: copy.sunLabel,
+            label: curCopy.sunLabel,
             kind: "landmark",
           });
           for (const planet of PLANETS_J2000) {
             const [px, py, pz] = planetPositionAu(planet, nowMs);
             pushLabel(px, py, pz, {
               id: `planet-${planet.id}`,
-              label: locale === "es" ? planet.nameEs : planet.nameEn,
-              sublabel: planet.isEarth ? copy.youAreHere : undefined,
+              label: curLocale === "es" ? planet.nameEs : planet.nameEn,
+              sublabel: planet.isEarth ? curCopy.youAreHere : undefined,
               kind: "landmark",
               color: planet.colorHex,
             });
@@ -1058,26 +1098,99 @@ export function Explorer3DCanvas({
     return () => {
       cancelAnimationFrame(rafId);
       resizeObserver.disconnect();
-      if (cutoutTexture) cutoutTexture.dispose();
+      if (cutoutTextureRef.current) {
+        cutoutTextureRef.current.dispose();
+        cutoutTextureRef.current = null;
+      }
+      scaleGroupsRef.current = null;
+      reticleGroupRef.current = null;
+      cutoutMatRef.current = null;
+      cutoutBorderMatRef.current = null;
       cameraRef.current = null;
       renderer.dispose();
       if (renderer.domElement.parentNode === container) {
         container.removeChild(renderer.domElement);
       }
     };
-  }, [
-    hygData,
-    scale,
-    targetRaDeg,
-    targetDecDeg,
-    query.fieldSizeDeg,
-    cutoutImageUrl,
-    activeSubtraction,
-    locale,
-    copy.sunLabel,
-    copy.youAreHere,
-    copy.galacticCenter,
-  ]);
+  }, [hygData]);
+
+  // Toggle scale groups without tearing down WebGL
+  useEffect(() => {
+    const groups = scaleGroupsRef.current;
+    if (!groups) return;
+    groups.skyGroup.visible = scale === "sky-view";
+    groups.neighborhoodGroup.visible = scale === "neighborhood";
+    groups.milkyWayGroup.visible = scale === "milky-way";
+    groups.solarSystemGroup.visible = scale === "solar-system";
+  }, [scale]);
+
+  // Reposition 3D cutout reticle in-place when coordinates or field size change
+  useEffect(() => {
+    const reticle = reticleGroupRef.current;
+    if (!reticle) return;
+    const fieldDeg = Math.max(
+      SKY3D_CONSTANTS.skyCutoutMinAngularSizeDeg,
+      Number(query.fieldSizeDeg) || SKY3D_CONSTANTS.skyCutoutMinAngularSizeDeg
+    );
+    const angularRad = fieldDeg * SKY3D_CONSTANTS.degToRad;
+    const targetSize =
+      R.two * SKY3D_CONSTANTS.skyCutoutDistance * Math.tan(angularRad * R.half);
+    const scaleFactor = targetSize / cutoutBaseSizeRef.current;
+    const [cx, cy, cz] = equatorialToCartesian(
+      targetRaDeg,
+      targetDecDeg,
+      SKY3D_CONSTANTS.skyCutoutDistance
+    );
+    reticle.position.set(cx, cy, cz);
+    reticle.lookAt(0, 0, 0);
+    reticle.scale.setScalar(scaleFactor);
+  }, [targetRaDeg, targetDecDeg, query.fieldSizeDeg, hygData]);
+
+  // Update 3D cutout texture, layer opacity/tint & subtraction reticle in-place
+  useEffect(() => {
+    const mat = cutoutMatRef.current;
+    const borderMat = cutoutBorderMatRef.current;
+    if (borderMat) {
+      borderMat.color.setHex(
+        activeSubtraction ? R.reticleSubtractHex : R.losColorHex
+      );
+    }
+    if (!mat) return;
+
+    const activeLayer = layers.find((l) => l.visible) ?? layers[0];
+    const layerVisible = activeLayer ? activeLayer.visible : true;
+    const layerOpacity = activeLayer
+      ? activeLayer.opacity / R.percentDivisor
+      : R.cutoutMeshOpacity;
+    const tintHex = activeLayer ? TINT_HEX[activeLayer.tint] : "#ffffff";
+
+    mat.opacity = layerOpacity;
+    mat.color.set(activeSubtraction ? "#ffffff" : tintHex);
+
+    if (!cutoutImageUrl || !layerVisible) {
+      mat.visible = false;
+      mat.needsUpdate = true;
+      return;
+    }
+
+    const loader = new THREE.TextureLoader();
+    loader.setCrossOrigin("anonymous");
+    const nextTex = loader.load(cutoutImageUrl, (tex) => {
+      tex.colorSpace = THREE.SRGBColorSpace;
+      if (cutoutTextureRef.current && cutoutTextureRef.current !== tex) {
+        cutoutTextureRef.current.dispose();
+      }
+      cutoutTextureRef.current = tex;
+      mat.map = tex;
+      mat.visible = true;
+      mat.needsUpdate = true;
+    });
+    if (nextTex.image) {
+      mat.map = nextTex;
+      mat.visible = true;
+      mat.needsUpdate = true;
+    }
+  }, [cutoutImageUrl, activeSubtraction, layers, hygData]);
 
   const findNearestStarAtScreenPos = useCallback(
     (clientX: number, clientY: number): StarInspection | null => {
@@ -1392,6 +1505,16 @@ export function Explorer3DCanvas({
           {scale === "sky-view" && (
             <span className="border-l border-[var(--ae-border-subtle)] pl-2 font-mono text-[var(--ae-accent-primary)]">
               {copy.fovLabel} {hudFov}°
+            </span>
+          )}
+          {(activeSubtraction || activeFrame) && (
+            <span
+              data-testid="hud-active-frame"
+              className="border-l border-[var(--ae-border-subtle)] pl-2 font-mono text-[var(--ae-text-secondary)]"
+            >
+              {activeSubtraction
+                ? (activeSubtraction.summary ?? copy.activeSubtraction)
+                : `${activeFrame?.timestamp} | ${activeFrame?.band}`}
             </span>
           )}
         </div>
