@@ -1,8 +1,22 @@
 import type { ExplorerLocale } from "../types/explorer";
 import { PORTAL_FEATURED_SECTORS } from "./app";
 
-export type Sky3DScaleId =
-  "solar-system" | "neighborhood" | "milky-way" | "sky-view";
+export type Sky3DOverlayId =
+  "stars" | "deep-sky" | "planets" | "milky-way" | "grid" | "labels";
+
+export interface DeepSkyObject {
+  id: string;
+  nameEn: string;
+  nameEs: string;
+  kindEn: string;
+  kindEs: string;
+  raDeg: number;
+  decDeg: number;
+  distPc: number;
+  mag: number;
+  colorHex: string;
+  sizePx: number;
+}
 
 export interface HygStarDataset {
   source: string;
@@ -25,7 +39,7 @@ export interface Sky3DTarget {
 }
 
 export interface SkyObjectDetails {
-  kind: "star" | "target";
+  kind: "star" | "target" | "deep-sky" | "planet";
   id: string;
   name: string;
   subtitle: string;
@@ -559,6 +573,207 @@ export function planetPositionAu(
   return [xEcl, zEcl, -yEcl];
 }
 
+const ECLIPTIC_OBLIQUITY_DEG = 23.4392911;
+
+/**
+ * Convert a planet's heliocentric J2000 position into geocentric equatorial (RA, Dec) in degrees.
+ */
+export function geocentricPlanetSkyCoords(
+  planet: PlanetDefinition,
+  dateMs: number
+): { raDeg: number; decDeg: number; distAu: number } {
+  const earth = PLANETS_J2000.find((p) => p.isEarth);
+  const [px, py, pz] = planetPositionAu(planet, dateMs);
+  const [ex, ey, ez] = earth ? planetPositionAu(earth, dateMs) : [0, 0, 0];
+
+  // Undo Three.js Y-up -> ecliptic (xEcl, yEcl, zEcl)
+  const dx = px - ex;
+  const dy = -(pz - ez);
+  const dz = py - ey;
+  const distAu = Math.hypot(dx, dy, dz);
+
+  const eps = ECLIPTIC_OBLIQUITY_DEG * SKY3D_CONSTANTS.degToRad;
+  const cosE = Math.cos(eps);
+  const sinE = Math.sin(eps);
+
+  const xEq = dx;
+  const yEq = dy * cosE - dz * sinE;
+  const zEq = dy * sinE + dz * cosE;
+
+  const raRad = Math.atan2(yEq, xEq);
+  const decRad = Math.asin(
+    Math.max(-1, Math.min(1, zEq / Math.max(1e-6, distAu)))
+  );
+
+  return {
+    raDeg: (((raRad * SKY3D_CONSTANTS.radToDeg) % 360) + 360) % 360,
+    decDeg: decRad * SKY3D_CONSTANTS.radToDeg,
+    distAu,
+  };
+}
+
+/**
+ * Curated real Deep Sky Objects (Messier / NGC public J2000 coordinates).
+ */
+export const DEEP_SKY_OBJECTS: readonly DeepSkyObject[] = [
+  {
+    id: "m31",
+    nameEn: "M31 Andromeda Galaxy",
+    nameEs: "M31 Galaxia de Andrómeda",
+    kindEn: "Spiral Galaxy",
+    kindEs: "Galaxia espiral",
+    raDeg: 10.6847,
+    decDeg: 41.2687,
+    distPc: 778000,
+    mag: 3.44,
+    colorHex: "#c4b5fd",
+    sizePx: 22,
+  },
+  {
+    id: "m42",
+    nameEn: "M42 Orion Nebula",
+    nameEs: "M42 Nebulosa de Orión",
+    kindEn: "Diffuse Nebula",
+    kindEs: "Nebulosa difusa",
+    raDeg: 83.8221,
+    decDeg: -5.3911,
+    distPc: 412,
+    mag: 4.0,
+    colorHex: "#f472b6",
+    sizePx: 20,
+  },
+  {
+    id: "m45",
+    nameEn: "M45 Pleiades",
+    nameEs: "M45 Pléyades",
+    kindEn: "Open Cluster",
+    kindEs: "Cúmulo abierto",
+    raDeg: 56.75,
+    decDeg: 24.1167,
+    distPc: 136,
+    mag: 1.6,
+    colorHex: "#7dd3fc",
+    sizePx: 18,
+  },
+  {
+    id: "m1",
+    nameEn: "M1 Crab Nebula",
+    nameEs: "M1 Nebulosa del Cangrejo",
+    kindEn: "Supernova Remnant",
+    kindEs: "Remanente de supernova",
+    raDeg: 83.6331,
+    decDeg: 22.0145,
+    distPc: 2000,
+    mag: 8.4,
+    colorHex: "#fb923c",
+    sizePx: 15,
+  },
+  {
+    id: "m13",
+    nameEn: "M13 Hercules Cluster",
+    nameEs: "M13 Cúmulo de Hércules",
+    kindEn: "Globular Cluster",
+    kindEs: "Cúmulo globular",
+    raDeg: 250.4235,
+    decDeg: 36.4613,
+    distPc: 6800,
+    mag: 5.8,
+    colorHex: "#fde68a",
+    sizePx: 16,
+  },
+  {
+    id: "m8",
+    nameEn: "M8 Lagoon Nebula",
+    nameEs: "M8 Nebulosa de la Laguna",
+    kindEn: "Emission Nebula",
+    kindEs: "Nebulosa de emisión",
+    raDeg: 270.9042,
+    decDeg: -24.3867,
+    distPc: 1250,
+    mag: 6.0,
+    colorHex: "#f472b6",
+    sizePx: 17,
+  },
+  {
+    id: "m51",
+    nameEn: "M51 Whirlpool Galaxy",
+    nameEs: "M51 Galaxia del Remolino",
+    kindEn: "Spiral Galaxy",
+    kindEs: "Galaxia espiral",
+    raDeg: 202.4696,
+    decDeg: 47.1953,
+    distPc: 7100000,
+    mag: 8.4,
+    colorHex: "#c4b5fd",
+    sizePx: 15,
+  },
+  {
+    id: "m57",
+    nameEn: "M57 Ring Nebula",
+    nameEs: "M57 Nebulosa del Anillo",
+    kindEn: "Planetary Nebula",
+    kindEs: "Nebulosa planetaria",
+    raDeg: 283.3962,
+    decDeg: 33.0292,
+    distPc: 787,
+    mag: 8.8,
+    colorHex: "#34d399",
+    sizePx: 14,
+  },
+  {
+    id: "m87",
+    nameEn: "M87 Virgo A",
+    nameEs: "M87 Virgo A",
+    kindEn: "Elliptical Galaxy",
+    kindEs: "Galaxia elíptica",
+    raDeg: 187.7059,
+    decDeg: 12.3911,
+    distPc: 16400000,
+    mag: 8.6,
+    colorHex: "#ddd6fe",
+    sizePx: 15,
+  },
+  {
+    id: "m104",
+    nameEn: "M104 Sombrero Galaxy",
+    nameEs: "M104 Galaxia del Sombrero",
+    kindEn: "Spiral Galaxy",
+    kindEs: "Galaxia espiral",
+    raDeg: 189.9976,
+    decDeg: -11.6231,
+    distPc: 9550000,
+    mag: 8.0,
+    colorHex: "#c4b5fd",
+    sizePx: 15,
+  },
+  {
+    id: "lmc",
+    nameEn: "Large Magellanic Cloud",
+    nameEs: "Gran Nube de Magallanes",
+    kindEn: "Dwarf Galaxy",
+    kindEs: "Galaxia enana",
+    raDeg: 80.8942,
+    decDeg: -69.7561,
+    distPc: 49970,
+    mag: 0.9,
+    colorHex: "#a5b4fc",
+    sizePx: 24,
+  },
+  {
+    id: "omega-cen",
+    nameEn: "NGC 5139 Omega Centauri",
+    nameEs: "NGC 5139 Omega Centauri",
+    kindEn: "Globular Cluster",
+    kindEs: "Cúmulo globular",
+    raDeg: 201.697,
+    decDeg: -47.4795,
+    distPc: 5200,
+    mag: 3.9,
+    colorHex: "#fde68a",
+    sizePx: 18,
+  },
+] as const;
+
 let cachedHygStars: HygStarDataset | null = null;
 let pendingHygPromise: Promise<HygStarDataset | null> | null = null;
 
@@ -587,8 +802,7 @@ export function loadHygStars(): Promise<HygStarDataset | null> {
 export const SKY_3D_COPY: Record<
   ExplorerLocale,
   {
-    scales: Record<Sky3DScaleId, string>;
-    scaleSubtitles: Record<Sky3DScaleId, string>;
+    overlays: Record<Sky3DOverlayId, string>;
     dragHint: string;
     scrollHint: string;
     loadingCatalog: string;
@@ -622,19 +836,15 @@ export const SKY_3D_COPY: Record<
   }
 > = {
   en: {
-    scales: {
-      "solar-system": "Solar System",
-      neighborhood: "Neighborhood",
+    overlays: {
+      stars: "Stars",
+      "deep-sky": "Deep Sky",
+      planets: "Planets",
       "milky-way": "Milky Way",
-      "sky-view": "Sky View",
+      grid: "Grid",
+      labels: "Labels",
     },
-    scaleSubtitles: {
-      "solar-system": "J2000 planetary orbits (AU)",
-      neighborhood: "Real 3D HYG stars (light-years)",
-      "milky-way": "4-arm spiral model (kpc)",
-      "sky-view": "Inside the celestial sphere (J2000)",
-    },
-    dragHint: "Drag to look / orbit",
+    dragHint: "Drag to look",
     scrollHint: "Scroll to zoom",
     loadingCatalog: "Loading HYG v4.1 star catalog...",
     catalogAttribution: "HYG v4.1 (CC BY-SA 4.0)",
@@ -668,19 +878,15 @@ export const SKY_3D_COPY: Record<
     activeRegionTitle: "Shared Coordinates",
   },
   es: {
-    scales: {
-      "solar-system": "Sistema Solar",
-      neighborhood: "Vecindad",
+    overlays: {
+      stars: "Estrellas",
+      "deep-sky": "Cielo profundo",
+      planets: "Planetas",
       "milky-way": "Vía Láctea",
-      "sky-view": "Vista Cielo",
+      grid: "Grilla",
+      labels: "Etiquetas",
     },
-    scaleSubtitles: {
-      "solar-system": "Órbitas planetarias J2000 (UA)",
-      neighborhood: "Estrellas HYG 3D reales (años luz)",
-      "milky-way": "Modelo espiral de 4 brazos (kpc)",
-      "sky-view": "Dentro de la esfera celeste (J2000)",
-    },
-    dragHint: "Arrastra para mirar / orbitar",
+    dragHint: "Arrastra para mirar",
     scrollHint: "Rueda para acercar",
     loadingCatalog: "Cargando catálogo HYG v4.1...",
     catalogAttribution: "HYG v4.1 (CC BY-SA 4.0)",

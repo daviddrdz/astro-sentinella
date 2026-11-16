@@ -170,7 +170,7 @@ describe("ExplorerView", () => {
     expect(screen.getByText("Línea de tiempo")).toBeInTheDocument();
   });
 
-  it("toggles between 2D and 3D views and switches 3D space scales", () => {
+  it("toggles between 2D and 3D views and toggles 3D sky overlays", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(null, { status: 404 })
     );
@@ -181,34 +181,22 @@ describe("ExplorerView", () => {
     fireEvent.click(btn3D);
 
     expect(screen.getByTestId("explorer-3d-canvas")).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Sky View" })).toHaveAttribute(
-      "aria-selected",
-      "true"
-    );
+    const deepSkyBtn = screen.getByRole("button", { name: "Deep Sky" });
+    expect(deepSkyBtn).toHaveAttribute("aria-pressed", "true");
 
-    fireEvent.click(screen.getByRole("tab", { name: "Neighborhood" }));
-    expect(screen.getByRole("tab", { name: "Neighborhood" })).toHaveAttribute(
-      "aria-selected",
-      "true"
-    );
+    fireEvent.click(deepSkyBtn);
+    expect(deepSkyBtn).toHaveAttribute("aria-pressed", "false");
 
-    fireEvent.click(screen.getByRole("tab", { name: "Milky Way" }));
-    expect(screen.getByRole("tab", { name: "Milky Way" })).toHaveAttribute(
-      "aria-selected",
-      "true"
-    );
-
-    fireEvent.click(screen.getByRole("tab", { name: "Solar System" }));
-    expect(screen.getByRole("tab", { name: "Solar System" })).toHaveAttribute(
-      "aria-selected",
-      "true"
-    );
+    const planetsBtn = screen.getByRole("button", { name: "Planets" });
+    expect(planetsBtn).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(planetsBtn);
+    expect(planetsBtn).toHaveAttribute("aria-pressed", "false");
 
     fireEvent.click(screen.getByRole("button", { name: "2D" }));
     expect(screen.queryByTestId("explorer-3d-canvas")).not.toBeInTheDocument();
   });
 
-  it("toggles between 2D and 3D views and switches 3D space scales", () => {
+  it("toggles between 2D and 3D views and toggles 3D sky overlays", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(null, { status: 404 })
     );
@@ -219,28 +207,16 @@ describe("ExplorerView", () => {
     fireEvent.click(btn3D);
 
     expect(screen.getByTestId("explorer-3d-canvas")).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Sky View" })).toHaveAttribute(
-      "aria-selected",
-      "true"
-    );
+    const deepSkyBtn = screen.getByRole("button", { name: "Deep Sky" });
+    expect(deepSkyBtn).toHaveAttribute("aria-pressed", "true");
 
-    fireEvent.click(screen.getByRole("tab", { name: "Neighborhood" }));
-    expect(screen.getByRole("tab", { name: "Neighborhood" })).toHaveAttribute(
-      "aria-selected",
-      "true"
-    );
+    fireEvent.click(deepSkyBtn);
+    expect(deepSkyBtn).toHaveAttribute("aria-pressed", "false");
 
-    fireEvent.click(screen.getByRole("tab", { name: "Milky Way" }));
-    expect(screen.getByRole("tab", { name: "Milky Way" })).toHaveAttribute(
-      "aria-selected",
-      "true"
-    );
-
-    fireEvent.click(screen.getByRole("tab", { name: "Solar System" }));
-    expect(screen.getByRole("tab", { name: "Solar System" })).toHaveAttribute(
-      "aria-selected",
-      "true"
-    );
+    const planetsBtn = screen.getByRole("button", { name: "Planets" });
+    expect(planetsBtn).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(planetsBtn);
+    expect(planetsBtn).toHaveAttribute("aria-pressed", "false");
 
     fireEvent.click(screen.getByRole("button", { name: "2D" }));
     expect(screen.queryByTestId("explorer-3d-canvas")).not.toBeInTheDocument();

@@ -11,7 +11,6 @@ import {
   parseSexagesimalDecDeg,
   parseSexagesimalRaDeg,
   SKY3D_CONSTANTS,
-  type Sky3DScaleId,
   type Sky3DTarget,
   type SkyObjectDetails,
 } from "../../config/sky3dCatalog";
@@ -109,7 +108,6 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
   const [viewMode, setViewMode] = useState<ExplorerViewMode>("2d");
   const [queryOverride, setQueryOverride] = useState<QueryParams | null>(null);
   const activeQuery = queryOverride ?? query;
-  const [scale3D, setScale3D] = useState<Sky3DScaleId>("sky-view");
   const [selectedSkyObject, setSelectedSkyObject] =
     useState<SkyObjectDetails | null>(null);
   const [centerRequest, setCenterRequest] = useState<Center3DRequest | null>(
@@ -556,7 +554,6 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
 
   const handleCenterSkyObject = (obj: SkyObjectDetails) => {
     setViewMode("3d");
-    setScale3D("sky-view");
     setCenterRequest((prev) => ({
       raDeg: obj.raDeg,
       decDeg: obj.decDeg,
@@ -629,8 +626,6 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
             activeFrame={activeFrame}
             activeSubtraction={activeSubtraction}
             locale={locale}
-            scale={scale3D}
-            onChangeScale={setScale3D}
             onSelectObject={setSelectedSkyObject}
             centerRequest={centerRequest}
           />

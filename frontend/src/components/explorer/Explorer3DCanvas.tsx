@@ -4,13 +4,14 @@ import * as THREE from "three";
 import {
   bvToRgb,
   bvToSpectralClass,
+  DEEP_SKY_OBJECTS,
   equatorialToCartesian,
   equatorialToGalacticDeg,
   formatDecSexagesimal,
   formatRaSexagesimal,
+  geocentricPlanetSkyCoords,
   loadHygStars,
   PLANETS_J2000,
-  planetPositionAu,
   parseSexagesimalDecDeg,
   parseSexagesimalRaDeg,
   SKY_3D_COPY,
@@ -18,7 +19,7 @@ import {
   SKY3D_RENDER_CONSTANTS as R,
   SPHEREX_3D_TARGETS,
   type HygStarDataset,
-  type Sky3DScaleId,
+  type Sky3DOverlayId,
   type Sky3DTarget,
   type SkyObjectDetails,
 } from "../../config/sky3dCatalog";
@@ -53,8 +54,6 @@ interface Explorer3DCanvasProps {
   activeFrame: ExplorerFrame | null;
   activeSubtraction?: SubtractionResult | null;
   locale: ExplorerLocale;
-  scale?: Sky3DScaleId;
-  onChangeScale?: (nextScale: Sky3DScaleId) => void;
   onSelectObject?: (obj: SkyObjectDetails) => void;
   centerRequest?: Center3DRequest | null;
 }
@@ -65,39 +64,24 @@ interface ProjectedLabel {
   sublabel?: string;
   x: number;
   y: number;
-  kind: "target" | "star" | "landmark";
+  kind: "target" | "star" | "deep-sky" | "planet";
   target?: Sky3DTarget;
   color?: string;
 }
 
-interface StarInspection {
-  name: string | null;
+interface SkyHoverInfo {
+  name: string;
+  subtitle: string;
   raDeg: number;
   decDeg: number;
   distPc: number;
   mag: number;
-  ci: number;
-  spectralClass: string;
   colorCss: string;
+  kind: "star" | "deep-sky" | "planet";
+  id: string;
   screenX: number;
   screenY: number;
 }
-
-const STAR_VERTEX_SHADER = /* glsl */ `
-  attribute float aSize;
-  attribute vec3 aColor;
-  varying vec3 vColor;
-  uniform float uPixelRatio;
-  uniform float uScaleBoost;
-
-  void main() {
-    vColor = aColor;
-    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-    float dist = max(1.0, -mvPosition.z);
-    gl_PointSize = clamp(aSize * uPixelRatio * uScaleBoost * (300.0 / dist), 1.4, 28.0);
-    gl_Position = projectionMatrix * mvPosition;
-  }
-`;
 
 const SKY_STAR_VERTEX_SHADER = /* glsl */ `
   attribute float aSize;
@@ -109,7 +93,7 @@ const SKY_STAR_VERTEX_SHADER = /* glsl */ `
   void main() {
     vColor = aColor;
     vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-    gl_PointSize = clamp(aSize * uPixelRatio * uFovFactor, 1.2, 18.0);
+    gl_PointSize = clamp(aSize * uPixelRatio * uFovFactor, 1.2, 26.0);
     gl_Position = projectionMatrix * mvPosition;
   }
 `;
@@ -128,6 +112,15 @@ const STAR_FRAGMENT_SHADER = /* glsl */ `
   }
 `;
 
+const OVERLAY_ORDER: readonly Sky3DOverlayId[] = [
+  "stars",
+  "deep-sky",
+  "planets",
+  "milky-way",
+  "grid",
+  "labels",
+];
+
 function getImageSourceUrl(
   activeFrame: ExplorerFrame | null,
   activeSubtraction?: SubtractionResult | null
@@ -143,7 +136,7 @@ function getImageSourceUrl(
   return activeFrame.imageUrl ?? null;
 }
 
-function createSkyStarsGroup(dataset: HygStarDataset): THREE.Points {
+function createSkyStarsPoints(dataset: HygStarDataset): THREE.Points {
   const count = dataset.stars.length;
   const positions = new Float32Array(count * R.three);
   const colors = new Float32Array(count * R.three);
@@ -191,9 +184,105 @@ function createSkyStarsGroup(dataset: HygStarDataset): THREE.Points {
     vertexShader: SKY_STAR_VERTEX_SHADER,
     fragmentShader: STAR_FRAGMENT_SHADER,
     uniforms: {
-      uPixelRatio: {
-        value: Math.min(window.devicePixelRatio || 1, R.two),
-      },
+      uPixelRatio: { value: Math.min(window.devicePixelRatio || 1, R.two) },
+      uFovFactor: { value: 1 },
+    },
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+
+  return new THREE.Points(geometry, material);
+}
+
+function createDeepSkyPoints(): THREE.Points {
+  const count = DEEP_SKY_OBJECTS.length;
+  const positions = new Float32Array(count * R.three);
+  const colors = new Float32Array(count * R.three);
+  const sizes = new Float32Array(count);
+
+  for (let i = 0; i < count; i += 1) {
+    const obj = DEEP_SKY_OBJECTS[i];
+    const [x, y, z] = equatorialToCartesian(
+      obj.raDeg,
+      obj.decDeg,
+      SKY3D_CONSTANTS.skySphereRadius * R.cutoutTargetRatio
+    );
+    const idx = i * R.three;
+    positions[idx] = x;
+    positions[idx + 1] = y;
+    positions[idx + R.two] = z;
+
+    const col = new THREE.Color(obj.colorHex);
+    colors[idx] = col.r;
+    colors[idx + 1] = col.g;
+    colors[idx + R.two] = col.b;
+    sizes[i] = obj.sizePx;
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(positions, R.three)
+  );
+  geometry.setAttribute("aColor", new THREE.BufferAttribute(colors, R.three));
+  geometry.setAttribute("aSize", new THREE.BufferAttribute(sizes, 1));
+
+  const material = new THREE.ShaderMaterial({
+    vertexShader: SKY_STAR_VERTEX_SHADER,
+    fragmentShader: STAR_FRAGMENT_SHADER,
+    uniforms: {
+      uPixelRatio: { value: Math.min(window.devicePixelRatio || 1, R.two) },
+      uFovFactor: { value: 1 },
+    },
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+
+  return new THREE.Points(geometry, material);
+}
+
+function createPlanetPoints(dateMs: number): THREE.Points {
+  const planets = PLANETS_J2000.filter((p) => !p.isEarth);
+  const count = planets.length;
+  const positions = new Float32Array(count * R.three);
+  const colors = new Float32Array(count * R.three);
+  const sizes = new Float32Array(count);
+
+  for (let i = 0; i < count; i += 1) {
+    const planet = planets[i];
+    const { raDeg, decDeg } = geocentricPlanetSkyCoords(planet, dateMs);
+    const [x, y, z] = equatorialToCartesian(
+      raDeg,
+      decDeg,
+      SKY3D_CONSTANTS.skySphereRadius * R.cutoutTargetRatio
+    );
+    const idx = i * R.three;
+    positions[idx] = x;
+    positions[idx + 1] = y;
+    positions[idx + R.two] = z;
+
+    const col = new THREE.Color(planet.colorHex);
+    colors[idx] = col.r;
+    colors[idx + 1] = col.g;
+    colors[idx + R.two] = col.b;
+    sizes[i] = planet.radiusPx * R.two;
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(positions, R.three)
+  );
+  geometry.setAttribute("aColor", new THREE.BufferAttribute(colors, R.three));
+  geometry.setAttribute("aSize", new THREE.BufferAttribute(sizes, 1));
+
+  const material = new THREE.ShaderMaterial({
+    vertexShader: SKY_STAR_VERTEX_SHADER,
+    fragmentShader: STAR_FRAGMENT_SHADER,
+    uniforms: {
+      uPixelRatio: { value: Math.min(window.devicePixelRatio || 1, R.two) },
       uFovFactor: { value: 1 },
     },
     transparent: true,
@@ -324,353 +413,63 @@ function createSkyEquatorialGrid(): THREE.Group {
   return group;
 }
 
-function createNeighborhoodGroup(
-  dataset: HygStarDataset,
-  targetRaDeg: number,
-  targetDecDeg: number
-): THREE.Group {
-  const group = new THREE.Group();
-  const count = dataset.stars.length;
-  const positions = new Float32Array(count * R.three);
-  const colors = new Float32Array(count * R.three);
-  const sizes = new Float32Array(count);
-
-  const scale = SKY3D_CONSTANTS.neighborhoodSceneScalePerPc;
-  const maxPc = SKY3D_CONSTANTS.neighborhoodMaxDistPc;
-
-  for (let i = 0; i < count; i += 1) {
-    const [raDeg, decDeg, distPc, mag, ci] = dataset.stars[i];
-    const clampedPc = Math.min(distPc, maxPc);
-    const [x, y, z] = equatorialToCartesian(raDeg, decDeg, clampedPc * scale);
-    const idx = i * R.three;
-    positions[idx] = x;
-    positions[idx + 1] = y;
-    positions[idx + R.two] = z;
-
-    const [r, g, b] = bvToRgb(ci);
-    colors[idx] = r;
-    colors[idx + 1] = g;
-    colors[idx + R.two] = b;
-
-    const norm = Math.max(
-      0,
-      Math.min(
-        1,
-        (SKY3D_CONSTANTS.skyStarFaintMag - mag) /
-          (SKY3D_CONSTANTS.skyStarFaintMag - SKY3D_CONSTANTS.skyStarBrightMag)
-      )
-    );
-    sizes[i] =
-      SKY3D_CONSTANTS.skyStarMinSize + norm * R.neighborhoodStarSizeBoost;
-  }
-
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute("position", new THREE.BufferAttribute(positions, R.three));
-  geo.setAttribute("aColor", new THREE.BufferAttribute(colors, R.three));
-  geo.setAttribute("aSize", new THREE.BufferAttribute(sizes, 1));
-
-  const mat = new THREE.ShaderMaterial({
-    vertexShader: STAR_VERTEX_SHADER,
-    fragmentShader: STAR_FRAGMENT_SHADER,
-    uniforms: {
-      uPixelRatio: { value: Math.min(window.devicePixelRatio || 1, R.two) },
-      uScaleBoost: { value: R.neighborhoodScaleBoost },
-    },
-    transparent: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-  });
-  group.add(new THREE.Points(geo, mat));
-
-  const ringMat = new THREE.LineBasicMaterial({
-    color: R.skyGridColorHex,
-    transparent: true,
-    opacity: R.neighborhoodRingOpacity,
-  });
-  const segs = SKY3D_CONSTANTS.neighborhoodRingSegments;
-  for (const ly of SKY3D_CONSTANTS.neighborhoodRingsLy) {
-    const r = (ly / SKY3D_CONSTANTS.pcToLy) * scale;
-    const pts: THREE.Vector3[] = [];
-    for (let s = 0; s <= segs; s += 1) {
-      const a = (s / segs) * SKY3D_CONSTANTS.twoPi;
-      pts.push(new THREE.Vector3(Math.cos(a) * r, 0, Math.sin(a) * r));
-    }
-    group.add(
-      new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), ringMat)
-    );
-  }
-
-  const sunGeo = new THREE.BufferGeometry();
-  sunGeo.setAttribute(
-    "position",
-    new THREE.BufferAttribute(new Float32Array([0, 0, 0]), R.three)
-  );
-  sunGeo.setAttribute(
-    "aColor",
-    new THREE.BufferAttribute(
-      new Float32Array([R.sunColorR, R.sunColorG, R.sunColorB]),
-      R.three
-    )
-  );
-  sunGeo.setAttribute(
-    "aSize",
-    new THREE.BufferAttribute(new Float32Array([R.sunGlowSize]), 1)
-  );
-  group.add(new THREE.Points(sunGeo, mat));
-
-  const [tx, ty, tz] = equatorialToCartesian(
-    targetRaDeg,
-    targetDecDeg,
-    R.lineOfSightLenPc * scale
-  );
-  const losGeo = new THREE.BufferGeometry().setFromPoints([
-    new THREE.Vector3(0, 0, 0),
-    new THREE.Vector3(tx, ty, tz),
-  ]);
-  const losMat = new THREE.LineBasicMaterial({
-    color: R.losColorHex,
-    transparent: true,
-    opacity: R.losOpacity,
-  });
-  group.add(new THREE.Line(losGeo, losMat));
-
-  return group;
-}
-
-function createMilkyWayGroup(): THREE.Group {
-  const group = new THREE.Group();
-  const count = SKY3D_CONSTANTS.milkyWayPointCount;
-  const positions = new Float32Array(count * R.three);
-  const colors = new Float32Array(count * R.three);
-  const sizes = new Float32Array(count);
-
-  let seed = R.prngSeedMw;
-  const rand = (): number => {
-    seed = (seed * R.prngMult) % R.prngMod;
-    return (seed - 1) / R.prngDenom;
-  };
-  const gaussian = (): number => {
-    const u = Math.max(R.mwMinLog, rand());
-    const v = rand();
-    return (
-      Math.sqrt(-R.two * Math.log(u)) * Math.cos(SKY3D_CONSTANTS.twoPi * v)
-    );
-  };
-
-  for (let i = 0; i < count; i += 1) {
-    const idx = i * R.three;
-    const isCore = i < count * R.milkyWayCoreFrac;
-    if (isCore) {
-      const r = Math.abs(gaussian()) * SKY3D_CONSTANTS.milkyWayCoreRadiusKpc;
-      const theta = rand() * SKY3D_CONSTANTS.twoPi;
-      const y = gaussian() * R.milkyWayCoreThickness * R.mwCoreThicknessScale;
-      positions[idx] = Math.cos(theta) * r;
-      positions[idx + 1] = y;
-      positions[idx + R.two] = Math.sin(theta) * r;
-
-      colors[idx] = 1;
-      colors[idx + 1] = R.mwCoreColorG;
-      colors[idx + R.two] = R.mwCoreColorB;
-      sizes[i] = R.milkyWayPointSize * R.mwCoreSizeMult;
-    } else {
-      const arm = i % SKY3D_CONSTANTS.milkyWayArmCount;
-      const radius =
-        Math.pow(rand(), R.mwArmRadiusPow) * SKY3D_CONSTANTS.milkyWayRadiusKpc;
-      const armBaseAngle =
-        (arm / SKY3D_CONSTANTS.milkyWayArmCount) * SKY3D_CONSTANTS.twoPi;
-      const spiralAngle =
-        (radius / SKY3D_CONSTANTS.milkyWayRadiusKpc) *
-        SKY3D_CONSTANTS.milkyWaySpiralTightness *
-        Math.PI;
-      const scatter =
-        gaussian() *
-        (R.milkyWayArmSpread +
-          R.mwArmScatterBase *
-            (1 / (R.half + radius * R.mwArmScatterRadiusScale)));
-      const angle = armBaseAngle + spiralAngle + scatter;
-      const y =
-        gaussian() *
-        R.milkyWayThickness *
-        Math.exp(
-          -radius / (SKY3D_CONSTANTS.milkyWayRadiusKpc * R.mwThickFalloff)
-        );
-
-      positions[idx] = Math.cos(angle) * radius;
-      positions[idx + 1] = y;
-      positions[idx + R.two] = Math.sin(angle) * radius;
-
-      const t = radius / SKY3D_CONSTANTS.milkyWayRadiusKpc;
-      colors[idx] = R.mwArmRedBase - R.mwArmRedDrop * t;
-      colors[idx + 1] = R.mwArmGreenBase - R.mwArmGreenDrop * t;
-      colors[idx + R.two] = R.mwArmBlueBase + R.mwArmBlueBoost * t;
-      sizes[i] = R.milkyWayPointSize * (R.half + rand());
-    }
-  }
-
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute("position", new THREE.BufferAttribute(positions, R.three));
-  geo.setAttribute("aColor", new THREE.BufferAttribute(colors, R.three));
-  geo.setAttribute("aSize", new THREE.BufferAttribute(sizes, 1));
-
-  const mat = new THREE.ShaderMaterial({
-    vertexShader: STAR_VERTEX_SHADER,
-    fragmentShader: STAR_FRAGMENT_SHADER,
-    uniforms: {
-      uPixelRatio: { value: Math.min(window.devicePixelRatio || 1, R.two) },
-      uScaleBoost: { value: R.mwScaleBoost },
-    },
-    transparent: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-  });
-
-  group.add(new THREE.Points(geo, mat));
-
-  const sunGeo = new THREE.BufferGeometry();
-  sunGeo.setAttribute(
-    "position",
-    new THREE.BufferAttribute(
-      new Float32Array([SKY3D_CONSTANTS.milkyWaySunRadiusKpc, 0, 0]),
-      R.three
-    )
-  );
-  sunGeo.setAttribute(
-    "aColor",
-    new THREE.BufferAttribute(
-      new Float32Array([R.mwSunColorR, R.mwSunColorG, R.mwSunColorB]),
-      R.three
-    )
-  );
-  sunGeo.setAttribute(
-    "aSize",
-    new THREE.BufferAttribute(new Float32Array([R.sunGlowSize]), 1)
-  );
-  group.add(new THREE.Points(sunGeo, mat));
-
-  return group;
-}
-
-function createSolarSystemGroup(): THREE.Group {
-  const group = new THREE.Group();
-  const nowMs = Date.now();
-  const segs = SKY3D_CONSTANTS.solarOrbitSegments;
-
-  const sunGeo = new THREE.BufferGeometry();
-  sunGeo.setAttribute(
-    "position",
-    new THREE.BufferAttribute(new Float32Array([0, 0, 0]), R.three)
-  );
-  sunGeo.setAttribute(
-    "aColor",
-    new THREE.BufferAttribute(
-      new Float32Array([1, R.ssSunColorG, R.ssSunColorB]),
-      R.three
-    )
-  );
-  sunGeo.setAttribute(
-    "aSize",
-    new THREE.BufferAttribute(
-      new Float32Array([R.sunGlowSize * R.ssSunSizeMult]),
-      1
-    )
-  );
-  const glowMat = new THREE.ShaderMaterial({
-    vertexShader: STAR_VERTEX_SHADER,
-    fragmentShader: STAR_FRAGMENT_SHADER,
-    uniforms: {
-      uPixelRatio: { value: Math.min(window.devicePixelRatio || 1, R.two) },
-      uScaleBoost: { value: R.ssGlowBoost },
-    },
-    transparent: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-  });
-  group.add(new THREE.Points(sunGeo, glowMat));
-
-  for (const planet of PLANETS_J2000) {
-    const orbitPts: THREE.Vector3[] = [];
-    const periodMs =
-      planet.orbitalPeriodYears * SKY3D_CONSTANTS.msPerJulianYear;
-    for (let s = 0; s <= segs; s += 1) {
-      const sampleMs = nowMs + (s / segs) * periodMs;
-      const [px, py, pz] = planetPositionAu(planet, sampleMs);
-      orbitPts.push(new THREE.Vector3(px, py, pz));
-    }
-    const orbitGeo = new THREE.BufferGeometry().setFromPoints(orbitPts);
-    const orbitMat = new THREE.LineBasicMaterial({
-      color: new THREE.Color(planet.colorHex),
-      transparent: true,
-      opacity: planet.isEarth ? R.ssEarthOpacity : R.ssOrbitOpacity,
-    });
-    group.add(new THREE.Line(orbitGeo, orbitMat));
-
-    const [cx, cy, cz] = planetPositionAu(planet, nowMs);
-    const sphereGeo = new THREE.SphereGeometry(
-      R.planetMarkerScale * Math.sqrt(planet.radiusPx / R.ssPlanetRefRadius),
-      R.ssPlanetWidthSegs,
-      R.ssPlanetHeightSegs
-    );
-    const sphereMat = new THREE.MeshBasicMaterial({
-      color: new THREE.Color(planet.colorHex),
-    });
-    const mesh = new THREE.Mesh(sphereGeo, sphereMat);
-    mesh.position.set(cx, cy, cz);
-    group.add(mesh);
-  }
-
-  return group;
-}
-
 export function Explorer3DCanvas({
   query,
   layers = [],
   activeFrame,
   activeSubtraction,
   locale,
-  scale: controlledScale,
-  onChangeScale,
   onSelectObject,
   centerRequest,
 }: Explorer3DCanvasProps) {
   const copy = SKY_3D_COPY[locale];
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  const [internalScale, setInternalScale] = useState<Sky3DScaleId>("sky-view");
-  const scale = controlledScale ?? internalScale;
-  const setScale = useCallback(
-    (next: Sky3DScaleId) => {
-      if (onChangeScale) {
-        onChangeScale(next);
-      } else {
-        setInternalScale(next);
-      }
-    },
-    [onChangeScale]
-  );
+  const [overlays, setOverlays] = useState<Record<Sky3DOverlayId, boolean>>({
+    stars: true,
+    "deep-sky": true,
+    planets: true,
+    "milky-way": true,
+    grid: true,
+    labels: true,
+  });
   const [hygData, setHygData] = useState<HygStarDataset | null>(null);
   const [loadingStars, setLoadingStars] = useState(true);
   const [webglUnavailable, setWebglUnavailable] = useState(false);
-  const [hoveredStar, setHoveredStar] = useState<StarInspection | null>(null);
+  const [hoveredItem, setHoveredItem] = useState<SkyHoverInfo | null>(null);
   const [hudFov, setHudFov] = useState<number>(SKY3D_CONSTANTS.defaultFovDeg);
   const [projectedLabels, setProjectedLabels] = useState<ProjectedLabel[]>([]);
+
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
-  const scaleRef = useRef<Sky3DScaleId>(scale);
-  const localeRef = useRef<ExplorerLocale>(locale);
-  const scaleGroupsRef = useRef<{
-    skyGroup: THREE.Group;
-    neighborhoodGroup: THREE.Group;
-    milkyWayGroup: THREE.Group;
-    solarSystemGroup: THREE.Group;
+  const overlaysRef = useRef(overlays);
+  const localeRef = useRef(locale);
+  const skyObjectsRef = useRef<{
+    starsPoints: THREE.Points | null;
+    deepSkyPoints: THREE.Points;
+    planetPoints: THREE.Points;
+    milkyWayBand: THREE.Points;
+    gridGroup: THREE.Group;
   } | null>(null);
   const reticleGroupRef = useRef<THREE.Group | null>(null);
   const cutoutMatRef = useRef<THREE.MeshBasicMaterial | null>(null);
   const cutoutBorderMatRef = useRef<THREE.LineBasicMaterial | null>(null);
   const cutoutTextureRef = useRef<THREE.Texture | null>(null);
   const cutoutBaseSizeRef = useRef<number>(1);
+  const planetCoordsRef = useRef<
+    Array<{
+      id: string;
+      nameEn: string;
+      nameEs: string;
+      raDeg: number;
+      decDeg: number;
+      distPc: number;
+      colorHex: string;
+    }>
+  >([]);
 
   useEffect(() => {
-    scaleRef.current = scale;
-  }, [scale]);
+    overlaysRef.current = overlays;
+  }, [overlays]);
 
   useEffect(() => {
     localeRef.current = locale;
@@ -692,8 +491,6 @@ export function Explorer3DCanvas({
     targetPitch: number;
     fov: number;
     targetFov: number;
-    orbitRadius: number;
-    targetOrbitRadius: number;
     isDragging: boolean;
     lastX: number;
     lastY: number;
@@ -705,8 +502,6 @@ export function Explorer3DCanvas({
     targetPitch: 0,
     fov: SKY3D_CONSTANTS.defaultFovDeg,
     targetFov: SKY3D_CONSTANTS.defaultFovDeg,
-    orbitRadius: SKY3D_CONSTANTS.neighborhoodDefaultRadius,
-    targetOrbitRadius: SKY3D_CONSTANTS.neighborhoodDefaultRadius,
     isDragging: false,
     lastX: 0,
     lastY: 0,
@@ -760,34 +555,6 @@ export function Explorer3DCanvas({
     }
   }, [centerRequest]);
 
-  const handleSelectScale = (nextScale: Sky3DScaleId) => {
-    setScale(nextScale);
-    if (nextScale === "solar-system") {
-      camStateRef.current.targetOrbitRadius =
-        SKY3D_CONSTANTS.solarSystemDefaultRadius;
-      camStateRef.current.orbitRadius =
-        SKY3D_CONSTANTS.solarSystemDefaultRadius;
-      camStateRef.current.targetPitch = R.pitchSolarSystem;
-    } else if (nextScale === "neighborhood") {
-      camStateRef.current.targetOrbitRadius =
-        SKY3D_CONSTANTS.neighborhoodDefaultRadius;
-      camStateRef.current.orbitRadius =
-        SKY3D_CONSTANTS.neighborhoodDefaultRadius;
-      camStateRef.current.targetPitch = R.pitchNeighborhood;
-    } else if (nextScale === "milky-way") {
-      camStateRef.current.targetOrbitRadius =
-        SKY3D_CONSTANTS.milkyWayDefaultRadius;
-      camStateRef.current.orbitRadius = SKY3D_CONSTANTS.milkyWayDefaultRadius;
-      camStateRef.current.targetPitch = R.pitchMilkyWay;
-    } else {
-      aimCameraAtSkyCoords(
-        targetRaDeg,
-        targetDecDeg,
-        SKY3D_CONSTANTS.defaultFovDeg
-      );
-    }
-  };
-
   useEffect(() => {
     let active = true;
     loadHygStars().then((dataset) => {
@@ -837,16 +604,51 @@ export function Explorer3DCanvas({
     );
     cameraRef.current = camera;
 
-    const skyGroup = new THREE.Group();
-    const milkyWayBand = createSkyMilkyWayBand();
-    skyGroup.add(milkyWayBand);
-    skyGroup.add(createSkyEquatorialGrid());
+    const nowMs = Date.now();
+    planetCoordsRef.current = PLANETS_J2000.filter((p) => !p.isEarth).map(
+      (planet) => {
+        const { raDeg, decDeg, distAu } = geocentricPlanetSkyCoords(
+          planet,
+          nowMs
+        );
+        return {
+          id: planet.id,
+          nameEn: planet.nameEn,
+          nameEs: planet.nameEs,
+          raDeg,
+          decDeg,
+          distPc: distAu / SKY3D_CONSTANTS.auPerPc,
+          colorHex: planet.colorHex,
+        };
+      }
+    );
 
-    let skyStarsPoints: THREE.Points | null = null;
-    if (hygData) {
-      skyStarsPoints = createSkyStarsGroup(hygData);
-      skyGroup.add(skyStarsPoints);
-    }
+    const milkyWayBand = createSkyMilkyWayBand();
+    const gridGroup = createSkyEquatorialGrid();
+    const deepSkyPoints = createDeepSkyPoints();
+    const planetPoints = createPlanetPoints(nowMs);
+    const starsPoints = hygData ? createSkyStarsPoints(hygData) : null;
+
+    const curOv = overlaysRef.current;
+    milkyWayBand.visible = curOv["milky-way"];
+    gridGroup.visible = curOv.grid;
+    deepSkyPoints.visible = curOv["deep-sky"];
+    planetPoints.visible = curOv.planets;
+    if (starsPoints) starsPoints.visible = curOv.stars;
+
+    skyObjectsRef.current = {
+      starsPoints,
+      deepSkyPoints,
+      planetPoints,
+      milkyWayBand,
+      gridGroup,
+    };
+
+    scene.add(milkyWayBand);
+    scene.add(gridGroup);
+    scene.add(deepSkyPoints);
+    scene.add(planetPoints);
+    if (starsPoints) scene.add(starsPoints);
 
     const angularRad =
       SKY3D_CONSTANTS.skyCutoutMinAngularSizeDeg * SKY3D_CONSTANTS.degToRad;
@@ -887,35 +689,11 @@ export function Explorer3DCanvas({
       visible: false,
     });
     reticleGroup.add(new THREE.Mesh(cutoutGeo, cutoutMat));
-    skyGroup.add(reticleGroup);
+    scene.add(reticleGroup);
 
     reticleGroupRef.current = reticleGroup;
     cutoutMatRef.current = cutoutMat;
     cutoutBorderMatRef.current = borderMat;
-
-    const neighborhoodGroup = hygData
-      ? createNeighborhoodGroup(hygData, 0, 0)
-      : new THREE.Group();
-    const milkyWayGroup = createMilkyWayGroup();
-    const solarSystemGroup = createSolarSystemGroup();
-
-    const activeScale = scaleRef.current;
-    skyGroup.visible = activeScale === "sky-view";
-    neighborhoodGroup.visible = activeScale === "neighborhood";
-    milkyWayGroup.visible = activeScale === "milky-way";
-    solarSystemGroup.visible = activeScale === "solar-system";
-
-    scaleGroupsRef.current = {
-      skyGroup,
-      neighborhoodGroup,
-      milkyWayGroup,
-      solarSystemGroup,
-    };
-
-    scene.add(skyGroup);
-    scene.add(neighborhoodGroup);
-    scene.add(milkyWayGroup);
-    scene.add(solarSystemGroup);
 
     const resizeObserver = new ResizeObserver(() => {
       const nextW = Math.max(1, container.clientWidth);
@@ -938,50 +716,52 @@ export function Explorer3DCanvas({
       st.yaw += (st.targetYaw - st.yaw) * SKY3D_CONSTANTS.dampingFactor;
       st.pitch += (st.targetPitch - st.pitch) * SKY3D_CONSTANTS.dampingFactor;
       st.fov += (st.targetFov - st.fov) * SKY3D_CONSTANTS.dampingFactor;
-      st.orbitRadius +=
-        (st.targetOrbitRadius - st.orbitRadius) * SKY3D_CONSTANTS.dampingFactor;
 
       if (Math.abs(camera.fov - st.fov) > R.fovEpsilon) {
         camera.fov = st.fov;
         camera.updateProjectionMatrix();
       }
 
-      if (scaleRef.current === "sky-view") {
-        camera.position.set(0, 0, 0);
-        const dirX = Math.cos(st.pitch) * Math.sin(st.yaw);
-        const dirY = Math.sin(st.pitch);
-        const dirZ = Math.cos(st.pitch) * Math.cos(st.yaw);
-        lookTarget.set(dirX, dirY, dirZ);
-        camera.lookAt(lookTarget);
+      camera.position.set(0, 0, 0);
+      const dirX = Math.cos(st.pitch) * Math.sin(st.yaw);
+      const dirY = Math.sin(st.pitch);
+      const dirZ = Math.cos(st.pitch) * Math.cos(st.yaw);
+      lookTarget.set(dirX, dirY, dirZ);
+      camera.lookAt(lookTarget);
 
-        const fovFactor = SKY3D_CONSTANTS.defaultFovDeg / st.fov;
-        if (skyStarsPoints) {
-          const mat = skyStarsPoints.material as THREE.ShaderMaterial;
-          mat.uniforms.uFovFactor.value = Math.min(
-            R.fovStarMax,
-            Math.max(R.fovStarMin, fovFactor)
-          );
-        }
-        const mwMat = milkyWayBand.material as THREE.ShaderMaterial;
-        mwMat.uniforms.uFovFactor.value = Math.min(
-          R.fovMwMax,
-          Math.max(R.fovMwMin, fovFactor)
+      const fovFactor = SKY3D_CONSTANTS.defaultFovDeg / st.fov;
+      if (starsPoints) {
+        const mat = starsPoints.material as THREE.ShaderMaterial;
+        mat.uniforms.uFovFactor.value = Math.min(
+          R.fovStarMax,
+          Math.max(R.fovStarMin, fovFactor)
         );
-      } else {
-        const ox = st.orbitRadius * Math.cos(st.pitch) * Math.sin(st.yaw);
-        const oy = st.orbitRadius * Math.sin(st.pitch);
-        const oz = st.orbitRadius * Math.cos(st.pitch) * Math.cos(st.yaw);
-        camera.position.set(ox, oy, oz);
-        camera.lookAt(0, 0, 0);
       }
+      const dsMat = deepSkyPoints.material as THREE.ShaderMaterial;
+      dsMat.uniforms.uFovFactor.value = Math.min(
+        R.fovStarMax,
+        Math.max(R.fovStarMin, fovFactor)
+      );
+      const mwMat = milkyWayBand.material as THREE.ShaderMaterial;
+      mwMat.uniforms.uFovFactor.value = Math.min(
+        R.fovMwMax,
+        Math.max(R.fovMwMin, fovFactor)
+      );
 
       renderer.render(scene, camera);
 
       frameTick += 1;
       if (frameTick % R.three === 0) {
+        const ov = overlaysRef.current;
+        if (!ov.labels) {
+          setProjectedLabels((prev) => (prev.length > 0 ? [] : prev));
+          return;
+        }
+
         const w = container.clientWidth;
         const h = container.clientHeight;
         const labels: ProjectedLabel[] = [];
+        const curLocale = localeRef.current;
 
         const pushLabel = (
           wx: number,
@@ -997,95 +777,69 @@ export function Explorer3DCanvas({
           labels.push({ ...item, x: sx, y: sy });
         };
 
-        const curScale = scaleRef.current;
-        const curLocale = localeRef.current;
-        const curCopy = SKY_3D_COPY[curLocale];
+        for (const target of SPHEREX_3D_TARGETS) {
+          const [tx, ty, tz] = equatorialToCartesian(
+            target.raDeg,
+            target.decDeg,
+            SKY3D_CONSTANTS.skySphereRadius * R.cutoutTargetRatio
+          );
+          pushLabel(tx, ty, tz, {
+            id: `target-${target.id}`,
+            label: target.name,
+            sublabel: target.category,
+            kind: "target",
+            target,
+          });
+        }
 
-        if (curScale === "sky-view") {
-          for (const target of SPHEREX_3D_TARGETS) {
-            const [tx, ty, tz] = equatorialToCartesian(
-              target.raDeg,
-              target.decDeg,
+        if (ov["deep-sky"]) {
+          for (const dso of DEEP_SKY_OBJECTS) {
+            const [dx, dy, dz] = equatorialToCartesian(
+              dso.raDeg,
+              dso.decDeg,
               SKY3D_CONSTANTS.skySphereRadius * R.cutoutTargetRatio
             );
-            pushLabel(tx, ty, tz, {
-              id: `target-${target.id}`,
-              label: target.name,
-              sublabel: target.category,
-              kind: "target",
-              target,
+            pushLabel(dx, dy, dz, {
+              id: `dso-${dso.id}`,
+              label: curLocale === "es" ? dso.nameEs : dso.nameEn,
+              kind: "deep-sky",
+              color: dso.colorHex,
             });
           }
-          if (hygData) {
-            let starCount = 0;
-            for (const [name, raDeg, decDeg] of hygData.named) {
-              if (starCount >= SKY3D_CONSTANTS.maxProjectionsLabelCount) break;
-              const [sx, sy, sz] = equatorialToCartesian(
-                raDeg,
-                decDeg,
-                SKY3D_CONSTANTS.skySphereRadius
-              );
-              const before = labels.length;
-              pushLabel(sx, sy, sz, {
-                id: `star-${name}`,
-                label: name,
-                kind: "star",
-              });
-              if (labels.length > before) starCount += 1;
-            }
-          }
-        } else if (curScale === "neighborhood") {
-          pushLabel(0, 0, 0, {
-            id: "sun-here",
-            label: curCopy.sunLabel,
-            sublabel: curCopy.youAreHere,
-            kind: "landmark",
-          });
-          for (const target of SPHEREX_3D_TARGETS) {
-            const r =
-              Math.min(target.distPc, SKY3D_CONSTANTS.neighborhoodMaxDistPc) *
-              SKY3D_CONSTANTS.neighborhoodSceneScalePerPc;
-            const [tx, ty, tz] = equatorialToCartesian(
-              target.raDeg,
-              target.decDeg,
-              r
+        }
+
+        if (ov.planets) {
+          for (const planet of planetCoordsRef.current) {
+            const [px, py, pz] = equatorialToCartesian(
+              planet.raDeg,
+              planet.decDeg,
+              SKY3D_CONSTANTS.skySphereRadius * R.cutoutTargetRatio
             );
-            pushLabel(tx, ty, tz, {
-              id: `target-${target.id}`,
-              label: target.name,
-              sublabel: `${Math.round(target.distPc * SKY3D_CONSTANTS.pcToLy)} ly`,
-              kind: "target",
-              target,
-            });
-          }
-        } else if (curScale === "milky-way") {
-          pushLabel(0, 0, 0, {
-            id: "gc",
-            label: curCopy.galacticCenter,
-            kind: "landmark",
-          });
-          pushLabel(SKY3D_CONSTANTS.milkyWaySunRadiusKpc, 0, 0, {
-            id: "sun-mw",
-            label: curCopy.sunLabel,
-            sublabel: curCopy.youAreHere,
-            kind: "landmark",
-          });
-        } else if (curScale === "solar-system") {
-          const nowMs = Date.now();
-          pushLabel(0, 0, 0, {
-            id: "sun-ss",
-            label: curCopy.sunLabel,
-            kind: "landmark",
-          });
-          for (const planet of PLANETS_J2000) {
-            const [px, py, pz] = planetPositionAu(planet, nowMs);
             pushLabel(px, py, pz, {
               id: `planet-${planet.id}`,
               label: curLocale === "es" ? planet.nameEs : planet.nameEn,
-              sublabel: planet.isEarth ? curCopy.youAreHere : undefined,
-              kind: "landmark",
+              kind: "planet",
               color: planet.colorHex,
             });
+          }
+        }
+
+        if (ov.stars && hygData) {
+          let starCount = 0;
+          for (const [name, raDeg, decDeg] of hygData.named) {
+            if (starCount >= SKY3D_CONSTANTS.maxProjectionsLabelCount) break;
+            const [sx, sy, sz] = equatorialToCartesian(
+              raDeg,
+              decDeg,
+              SKY3D_CONSTANTS.skySphereRadius
+            );
+            const before = labels.length;
+            pushLabel(sx, sy, sz, {
+              id: `star-${name}`,
+              label: name,
+              kind: "star",
+            });
+            if (labels.length > before) starCount += 1;
           }
         }
 
@@ -1102,7 +856,7 @@ export function Explorer3DCanvas({
         cutoutTextureRef.current.dispose();
         cutoutTextureRef.current = null;
       }
-      scaleGroupsRef.current = null;
+      skyObjectsRef.current = null;
       reticleGroupRef.current = null;
       cutoutMatRef.current = null;
       cutoutBorderMatRef.current = null;
@@ -1114,15 +868,16 @@ export function Explorer3DCanvas({
     };
   }, [hygData]);
 
-  // Toggle scale groups without tearing down WebGL
+  // Toggle sky overlays in-place without tearing down WebGL
   useEffect(() => {
-    const groups = scaleGroupsRef.current;
-    if (!groups) return;
-    groups.skyGroup.visible = scale === "sky-view";
-    groups.neighborhoodGroup.visible = scale === "neighborhood";
-    groups.milkyWayGroup.visible = scale === "milky-way";
-    groups.solarSystemGroup.visible = scale === "solar-system";
-  }, [scale]);
+    const objs = skyObjectsRef.current;
+    if (!objs) return;
+    if (objs.starsPoints) objs.starsPoints.visible = overlays.stars;
+    objs.deepSkyPoints.visible = overlays["deep-sky"];
+    objs.planetPoints.visible = overlays.planets;
+    objs.milkyWayBand.visible = overlays["milky-way"];
+    objs.gridGroup.visible = overlays.grid;
+  }, [overlays]);
 
   // Reposition 3D cutout reticle in-place when coordinates or field size change
   useEffect(() => {
@@ -1192,12 +947,11 @@ export function Explorer3DCanvas({
     }
   }, [cutoutImageUrl, activeSubtraction, layers, hygData]);
 
-  const findNearestStarAtScreenPos = useCallback(
-    (clientX: number, clientY: number): StarInspection | null => {
+  const findNearestSkyObjectAtScreenPos = useCallback(
+    (clientX: number, clientY: number): SkyHoverInfo | null => {
       const container = containerRef.current;
       const camera = cameraRef.current;
-      if (!container || !camera || !hygData) return null;
-      if (scale !== "sky-view" && scale !== "neighborhood") return null;
+      if (!container || !camera) return null;
 
       const rect = container.getBoundingClientRect();
       const px = clientX - rect.left;
@@ -1209,81 +963,119 @@ export function Explorer3DCanvas({
       const vec = new THREE.Vector3();
 
       let bestDistSq = hitSq;
-      let bestStar: {
-        name: string | null;
-        raDeg: number;
-        decDeg: number;
-        distPc: number;
-        mag: number;
-        ci: number;
-        sx: number;
-        sy: number;
-      } | null = null;
+      let bestMatch: SkyHoverInfo | null = null;
 
-      const projectCoords = (
+      const project = (
         raDeg: number,
         decDeg: number,
-        distPc: number
+        radius: number
       ): [number, number] | null => {
-        const radius =
-          scale === "sky-view"
-            ? SKY3D_CONSTANTS.skySphereRadius
-            : Math.min(distPc, SKY3D_CONSTANTS.neighborhoodMaxDistPc) *
-              SKY3D_CONSTANTS.neighborhoodSceneScalePerPc;
         const [wx, wy, wz] = equatorialToCartesian(raDeg, decDeg, radius);
         vec.set(wx, wy, wz).project(camera);
         if (vec.z > 1) return null;
         return [(vec.x * R.half + R.half) * w, (-vec.y * R.half + R.half) * h];
       };
 
-      for (const [raDeg, decDeg, distPc, mag, ci] of hygData.stars) {
-        const pt = projectCoords(raDeg, decDeg, distPc);
-        if (!pt) continue;
-        const dx = pt[0] - px;
-        const dy = pt[1] - py;
-        const dSq = dx * dx + dy * dy;
-        if (dSq < bestDistSq) {
-          bestDistSq = dSq;
-          bestStar = {
-            name: null,
-            raDeg,
-            decDeg,
-            distPc,
-            mag,
-            ci,
-            sx: pt[0],
-            sy: pt[1],
-          };
+      if (overlays.planets) {
+        for (const planet of planetCoordsRef.current) {
+          const pt = project(
+            planet.raDeg,
+            planet.decDeg,
+            SKY3D_CONSTANTS.skySphereRadius * R.cutoutTargetRatio
+          );
+          if (!pt) continue;
+          const dx = pt[0] - px;
+          const dy = pt[1] - py;
+          const dSq = dx * dx + dy * dy;
+          if (dSq < bestDistSq) {
+            bestDistSq = dSq;
+            bestMatch = {
+              id: `planet-${planet.id}`,
+              name: locale === "es" ? planet.nameEs : planet.nameEn,
+              subtitle: locale === "es" ? "Planeta" : "Planet",
+              raDeg: planet.raDeg,
+              decDeg: planet.decDeg,
+              distPc: planet.distPc,
+              mag: 0,
+              colorCss: planet.colorHex,
+              kind: "planet",
+              screenX: pt[0],
+              screenY: pt[1],
+            };
+          }
         }
       }
 
-      if (!bestStar) return null;
-
-      for (const [name, nRa, nDec] of hygData.named) {
-        if (
-          Math.abs(nRa - bestStar.raDeg) < R.namedStarMatchToleranceDeg &&
-          Math.abs(nDec - bestStar.decDeg) < R.namedStarMatchToleranceDeg
-        ) {
-          bestStar.name = name;
-          break;
+      if (overlays["deep-sky"]) {
+        for (const dso of DEEP_SKY_OBJECTS) {
+          const pt = project(
+            dso.raDeg,
+            dso.decDeg,
+            SKY3D_CONSTANTS.skySphereRadius * R.cutoutTargetRatio
+          );
+          if (!pt) continue;
+          const dx = pt[0] - px;
+          const dy = pt[1] - py;
+          const dSq = dx * dx + dy * dy;
+          if (dSq < bestDistSq) {
+            bestDistSq = dSq;
+            bestMatch = {
+              id: `dso-${dso.id}`,
+              name: locale === "es" ? dso.nameEs : dso.nameEn,
+              subtitle: locale === "es" ? dso.kindEs : dso.kindEn,
+              raDeg: dso.raDeg,
+              decDeg: dso.decDeg,
+              distPc: dso.distPc,
+              mag: dso.mag,
+              colorCss: dso.colorHex,
+              kind: "deep-sky",
+              screenX: pt[0],
+              screenY: pt[1],
+            };
+          }
         }
       }
 
-      const [r, g, b] = bvToRgb(bestStar.ci);
-      return {
-        name: bestStar.name,
-        raDeg: bestStar.raDeg,
-        decDeg: bestStar.decDeg,
-        distPc: bestStar.distPc,
-        mag: bestStar.mag,
-        ci: bestStar.ci,
-        spectralClass: bvToSpectralClass(bestStar.ci),
-        colorCss: `rgb(${Math.round(r * R.rgbScale)}, ${Math.round(g * R.rgbScale)}, ${Math.round(b * R.rgbScale)})`,
-        screenX: bestStar.sx,
-        screenY: bestStar.sy,
-      };
+      if (overlays.stars && hygData) {
+        for (const [raDeg, decDeg, distPc, mag, ci] of hygData.stars) {
+          const pt = project(raDeg, decDeg, SKY3D_CONSTANTS.skySphereRadius);
+          if (!pt) continue;
+          const dx = pt[0] - px;
+          const dy = pt[1] - py;
+          const dSq = dx * dx + dy * dy;
+          if (dSq < bestDistSq) {
+            bestDistSq = dSq;
+            let starName: string | null = null;
+            for (const [name, nRa, nDec] of hygData.named) {
+              if (
+                Math.abs(nRa - raDeg) < R.namedStarMatchToleranceDeg &&
+                Math.abs(nDec - decDeg) < R.namedStarMatchToleranceDeg
+              ) {
+                starName = name;
+                break;
+              }
+            }
+            const [r, g, b] = bvToRgb(ci);
+            bestMatch = {
+              id: `star-${raDeg.toFixed(R.three)}-${decDeg.toFixed(R.three)}`,
+              name: starName ?? copy.unnamedStar,
+              subtitle: bvToSpectralClass(ci),
+              raDeg,
+              decDeg,
+              distPc,
+              mag,
+              colorCss: `rgb(${Math.round(r * R.rgbScale)}, ${Math.round(g * R.rgbScale)}, ${Math.round(b * R.rgbScale)})`,
+              kind: "star",
+              screenX: pt[0],
+              screenY: pt[1],
+            };
+          }
+        }
+      }
+
+      return bestMatch;
     },
-    [hygData, scale]
+    [hygData, overlays, locale, copy.unnamedStar]
   );
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -1297,8 +1089,7 @@ export function Explorer3DCanvas({
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const st = camStateRef.current;
     if (!st.isDragging) {
-      const hit = findNearestStarAtScreenPos(e.clientX, e.clientY);
-      setHoveredStar(hit);
+      setHoveredItem(findNearestSkyObjectAtScreenPos(e.clientX, e.clientY));
       return;
     }
 
@@ -1308,13 +1099,11 @@ export function Explorer3DCanvas({
     st.lastY = e.clientY;
     st.dragDistance += Math.hypot(dx, dy);
     if (st.dragDistance > SKY3D_CONSTANTS.clickDragThresholdPx) {
-      setHoveredStar(null);
+      setHoveredItem(null);
     }
 
-    const sign = scale === "sky-view" ? 1 : -1;
-    const fovScale =
-      scale === "sky-view" ? st.fov / SKY3D_CONSTANTS.defaultFovDeg : 1;
-    const sens = SKY3D_CONSTANTS.dragSensitivity * fovScale * sign;
+    const fovScale = st.fov / SKY3D_CONSTANTS.defaultFovDeg;
+    const sens = SKY3D_CONSTANTS.dragSensitivity * fovScale;
     st.targetYaw += dx * sens;
     st.targetPitch = Math.max(
       SKY3D_CONSTANTS.minPitchRad,
@@ -1330,20 +1119,19 @@ export function Explorer3DCanvas({
       e.currentTarget.releasePointerCapture(e.pointerId);
     }
     if (wasClick) {
-      const hit = findNearestStarAtScreenPos(e.clientX, e.clientY);
+      const hit = findNearestSkyObjectAtScreenPos(e.clientX, e.clientY);
       if (hit && onSelectObject) {
         onSelectObject({
-          kind: "star",
-          id: `star-${hit.raDeg.toFixed(R.three)}-${hit.decDeg.toFixed(R.three)}`,
-          name: hit.name ?? copy.unnamedStar,
-          subtitle: hit.spectralClass,
+          kind: hit.kind,
+          id: hit.id,
+          name: hit.name,
+          subtitle: hit.subtitle,
           raDeg: hit.raDeg,
           decDeg: hit.decDeg,
           raDisplay: formatRaSexagesimal(hit.raDeg),
           decDisplay: formatDecSexagesimal(hit.decDeg),
           distPc: hit.distPc,
-          mag: hit.mag,
-          ci: hit.ci,
+          mag: hit.kind === "planet" ? undefined : hit.mag,
           colorCss: hit.colorCss,
         });
       }
@@ -1352,37 +1140,15 @@ export function Explorer3DCanvas({
 
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
     const st = camStateRef.current;
-    if (scale === "sky-view") {
-      const nextFov = Math.max(
-        SKY3D_CONSTANTS.minFovDeg,
-        Math.min(
-          SKY3D_CONSTANTS.maxFovDeg,
-          st.targetFov + e.deltaY * SKY3D_CONSTANTS.zoomFovWheelSensitivity
-        )
-      );
-      st.targetFov = nextFov;
-      setHudFov(Math.round(nextFov));
-      return;
-    }
-
-    const minR =
-      scale === "solar-system"
-        ? SKY3D_CONSTANTS.solarSystemMinRadius
-        : scale === "milky-way"
-          ? SKY3D_CONSTANTS.milkyWayMinRadius
-          : SKY3D_CONSTANTS.neighborhoodMinRadius;
-    const maxR =
-      scale === "solar-system"
-        ? SKY3D_CONSTANTS.solarSystemMaxRadius
-        : scale === "milky-way"
-          ? SKY3D_CONSTANTS.milkyWayMaxRadius
-          : SKY3D_CONSTANTS.neighborhoodMaxRadius;
-
-    const factor = 1 + e.deltaY * SKY3D_CONSTANTS.zoomWheelSensitivity;
-    st.targetOrbitRadius = Math.max(
-      minR,
-      Math.min(maxR, st.targetOrbitRadius * factor)
+    const nextFov = Math.max(
+      SKY3D_CONSTANTS.minFovDeg,
+      Math.min(
+        SKY3D_CONSTANTS.maxFovDeg,
+        st.targetFov + e.deltaY * SKY3D_CONSTANTS.zoomFovWheelSensitivity
+      )
     );
+    st.targetFov = nextFov;
+    setHudFov(Math.round(nextFov));
   };
 
   const handleSelectTarget = (target: Sky3DTarget) => {
@@ -1397,17 +1163,18 @@ export function Explorer3DCanvas({
         raDisplay: target.raDisplay,
         decDisplay: target.decDisplay,
         distPc: target.distPc,
-        colorCss: "#22d3ee",
+        colorCss: "#5b8fd9",
       });
-    }
-    if (scale !== "sky-view") {
-      setScale("sky-view");
     }
     aimCameraAtSkyCoords(
       target.raDeg,
       target.decDeg,
       SKY3D_CONSTANTS.telescopeFovDeg
     );
+  };
+
+  const toggleOverlay = (id: Sky3DOverlayId) => {
+    setOverlays((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
   return (
@@ -1417,12 +1184,12 @@ export function Explorer3DCanvas({
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      onPointerLeave={() => setHoveredStar(null)}
+      onPointerLeave={() => setHoveredItem(null)}
       onWheel={handleWheel}
     >
       <div
         ref={containerRef}
-        className={`absolute inset-0 ${hoveredStar ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"}`}
+        className={`absolute inset-0 ${hoveredItem ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"}`}
       />
 
       {webglUnavailable && (
@@ -1450,24 +1217,19 @@ export function Explorer3DCanvas({
             );
           }
 
-          if (item.kind === "landmark") {
+          if (item.kind === "deep-sky" || item.kind === "planet") {
             return (
               <div
                 key={item.id}
                 style={{ left: item.x, top: item.y }}
-                className="absolute -translate-x-1/2 -translate-y-full pb-1.5 text-center"
+                className="absolute -translate-x-1/2 -translate-y-full pb-1.5"
               >
                 <span
-                  className="rounded-full border border-[var(--ae-border-strong)] bg-[var(--ae-bg-surface)]/90 px-2.5 py-0.5 text-xs font-medium text-[var(--ae-text-primary)]"
+                  className="rounded-full border border-[var(--ae-border-strong)] bg-[var(--ae-bg-surface)]/90 px-2 py-0.5 text-xs font-medium"
                   style={item.color ? { color: item.color } : undefined}
                 >
                   {item.label}
                 </span>
-                {item.sublabel && (
-                  <div className="mt-0.5 text-xs text-[var(--ae-accent-primary)]">
-                    {item.sublabel}
-                  </div>
-                )}
               </div>
             );
           }
@@ -1497,20 +1259,18 @@ export function Explorer3DCanvas({
       </div>
 
       <div className="pointer-events-none absolute top-4 left-4 flex flex-col gap-2">
-        <div className="pointer-events-auto flex items-center gap-2 rounded-[var(--ae-radius-md)] border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-surface)]/90 px-3 py-1.5 text-[length:var(--ae-text-sm)] text-[var(--ae-text-primary)] backdrop-blur-md">
+        <div className="pointer-events-auto flex items-center gap-3 rounded-[var(--ae-radius-md)] border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-surface)]/90 px-3 py-1.5 text-[length:var(--ae-text-sm)] text-[var(--ae-text-primary)] backdrop-blur-md">
           <span className="font-mono">
-            {copy.raLabel} {targetRaDeg.toFixed(R.two)}° · {copy.decLabel}{" "}
+            {copy.raLabel} {targetRaDeg.toFixed(R.two)}° {copy.decLabel}{" "}
             {targetDecDeg.toFixed(R.two)}°
           </span>
-          {scale === "sky-view" && (
-            <span className="border-l border-[var(--ae-border-subtle)] pl-2 font-mono text-[var(--ae-accent-primary)]">
-              {copy.fovLabel} {hudFov}°
-            </span>
-          )}
+          <span className="border-l border-[var(--ae-border-subtle)] pl-2.5 font-mono text-[var(--ae-accent-primary)]">
+            {copy.fovLabel} {hudFov}°
+          </span>
           {(activeSubtraction || activeFrame) && (
             <span
               data-testid="hud-active-frame"
-              className="border-l border-[var(--ae-border-subtle)] pl-2 font-mono text-[var(--ae-text-secondary)]"
+              className="border-l border-[var(--ae-border-subtle)] pl-2.5 font-mono text-[var(--ae-text-secondary)]"
             >
               {activeSubtraction
                 ? (activeSubtraction.summary ?? copy.activeSubtraction)
@@ -1544,100 +1304,90 @@ export function Explorer3DCanvas({
         >
           {copy.recenterTarget}
         </button>
-
-        {scale === "sky-view" && (
-          <>
-            <button
-              type="button"
-              onClick={() =>
-                aimCameraAtSkyCoords(
-                  targetRaDeg,
-                  targetDecDeg,
-                  SKY3D_CONSTANTS.telescopeFovDeg
-                )
-              }
-              className="rounded-[var(--ae-radius-md)] border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-surface)]/90 px-3 py-1.5 text-[length:var(--ae-text-sm)] font-medium text-[var(--ae-text-primary)] backdrop-blur-md transition hover:border-[var(--ae-border-strong)] hover:bg-[var(--ae-bg-hover)]"
-            >
-              {copy.telescopeView}
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                aimCameraAtSkyCoords(
-                  targetRaDeg,
-                  targetDecDeg,
-                  SKY3D_CONSTANTS.wideSkyFovDeg
-                )
-              }
-              className="rounded-[var(--ae-radius-md)] border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-surface)]/90 px-3 py-1.5 text-[length:var(--ae-text-sm)] font-medium text-[var(--ae-text-primary)] backdrop-blur-md transition hover:border-[var(--ae-border-strong)] hover:bg-[var(--ae-bg-hover)]"
-            >
-              {copy.wideSkyView}
-            </button>
-          </>
-        )}
+        <button
+          type="button"
+          onClick={() =>
+            aimCameraAtSkyCoords(
+              targetRaDeg,
+              targetDecDeg,
+              SKY3D_CONSTANTS.telescopeFovDeg
+            )
+          }
+          className="rounded-[var(--ae-radius-md)] border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-surface)]/90 px-3 py-1.5 text-[length:var(--ae-text-sm)] font-medium text-[var(--ae-text-primary)] backdrop-blur-md transition hover:border-[var(--ae-border-strong)] hover:bg-[var(--ae-bg-hover)]"
+        >
+          {copy.telescopeView}
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            aimCameraAtSkyCoords(
+              targetRaDeg,
+              targetDecDeg,
+              SKY3D_CONSTANTS.wideSkyFovDeg
+            )
+          }
+          className="rounded-[var(--ae-radius-md)] border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-surface)]/90 px-3 py-1.5 text-[length:var(--ae-text-sm)] font-medium text-[var(--ae-text-primary)] backdrop-blur-md transition hover:border-[var(--ae-border-strong)] hover:bg-[var(--ae-bg-hover)]"
+        >
+          {copy.wideSkyView}
+        </button>
       </div>
 
-      {hoveredStar && (
+      {hoveredItem && (
         <div
           style={{
-            left: hoveredStar.screenX + R.tooltipOffsetX,
-            top: hoveredStar.screenY - R.tooltipOffsetY,
+            left: hoveredItem.screenX + R.tooltipOffsetX,
+            top: hoveredItem.screenY - R.tooltipOffsetY,
           }}
           className="pointer-events-none absolute z-20 rounded-[var(--ae-radius-md)] border border-[var(--ae-border-strong)] bg-[var(--ae-bg-surface)]/95 px-3 py-2 text-[length:var(--ae-text-sm)] text-[var(--ae-text-primary)] shadow-lg backdrop-blur-md"
         >
           <div className="flex items-center gap-2 font-medium">
             <span
               className="h-2.5 w-2.5 rounded-full"
-              style={{ backgroundColor: hoveredStar.colorCss }}
+              style={{ backgroundColor: hoveredItem.colorCss }}
             />
-            <span>{hoveredStar.name ?? copy.unnamedStar}</span>
+            <span>{hoveredItem.name}</span>
           </div>
           <div className="mt-0.5 font-mono text-xs text-[var(--ae-text-secondary)]">
-            {copy.magnitudeLabel} {hoveredStar.mag.toFixed(R.two)} ·{" "}
-            {Math.round(hoveredStar.distPc * SKY3D_CONSTANTS.pcToLy)} ly ·{" "}
-            {hoveredStar.spectralClass}
+            {hoveredItem.subtitle}
+            {hoveredItem.kind !== "planet" &&
+              ` ${copy.magnitudeLabel} ${hoveredItem.mag.toFixed(R.two)}`}
           </div>
         </div>
       )}
 
+      {/* Bottom Sky Overlays Dock */}
       <div
         className="absolute bottom-4 left-1/2 flex -translate-x-1/2 flex-col items-center gap-1.5"
         onPointerDown={(e) => e.stopPropagation()}
       >
         <div
           className="flex items-center gap-1 rounded-full border border-[var(--ae-border-strong)] bg-[var(--ae-bg-surface)]/90 p-1 shadow-xl backdrop-blur-md"
-          role="tablist"
-          aria-label="3D Space Scale"
+          role="group"
+          aria-label="3D Sky Overlays"
         >
-          {(
-            ["solar-system", "neighborhood", "milky-way", "sky-view"] as const
-          ).map((id) => {
-            const active = scale === id;
+          {OVERLAY_ORDER.map((id) => {
+            const active = overlays[id];
             return (
               <button
                 key={id}
                 type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => handleSelectScale(id)}
-                className={`rounded-full px-3.5 py-1 text-[length:var(--ae-text-sm)] font-medium transition ${
+                aria-pressed={active}
+                onClick={() => toggleOverlay(id)}
+                className={`rounded-full px-3 py-1 text-[length:var(--ae-text-sm)] font-medium transition ${
                   active
                     ? "bg-[var(--ae-accent-primary)] text-[var(--ae-accent-primary-content)]"
                     : "text-[var(--ae-text-secondary)] hover:bg-[var(--ae-bg-hover)] hover:text-[var(--ae-text-primary)]"
                 }`}
               >
-                {copy.scales[id]}
+                {copy.overlays[id]}
               </button>
             );
           })}
         </div>
         <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-[var(--ae-text-muted)]">
-          <span>{copy.scaleSubtitles[scale]}</span>
           <span>{copy.dragHint}</span>
           <span>{copy.scrollHint}</span>
-          {(scale === "sky-view" || scale === "neighborhood") && (
-            <span>{copy.starClickHint}</span>
-          )}
+          <span>{copy.starClickHint}</span>
         </div>
       </div>
 
