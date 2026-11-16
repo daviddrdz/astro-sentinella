@@ -59,12 +59,14 @@ export const SKY3D_CONSTANTS = {
   maxFovDeg: 105,
   telescopeFovDeg: 16,
   wideSkyFovDeg: 62,
-  dragSensitivity: 0.0045,
-  zoomWheelSensitivity: 0.0012,
-  zoomFovWheelSensitivity: 0.04,
+  dragSensitivity: 0.0016,
+  zoomWheelSensitivity: 0.00055,
+  zoomFovWheelSensitivity: 0.018,
   minPitchRad: -1.52,
   maxPitchRad: 1.52,
-  dampingFactor: 0.14,
+  dampingFactor: 0.1,
+  starHitRadiusPx: 16,
+  clickDragThresholdPx: 4,
 
   // Sky View (inside celestial sphere)
   skySphereRadius: 900,
@@ -205,6 +207,10 @@ export const SKY3D_RENDER_CONSTANTS = {
   fovStarMax: 2.4,
   fovMwMin: 0.8,
   fovMwMax: 1.6,
+  tooltipOffsetX: 14,
+  tooltipOffsetY: 12,
+  rgbScale: 255,
+  namedStarMatchToleranceDeg: 0.12,
 } as const;
 
 export const PLANETS_J2000: readonly PlanetDefinition[] = [
@@ -421,6 +427,19 @@ export function bvToRgb(bv: number): [number, number, number] {
 }
 
 /**
+ * Estimate Harvard spectral class from B-V color index.
+ */
+export function bvToSpectralClass(bv: number): string {
+  if (!Number.isFinite(bv)) return "G-type";
+  if (bv < -0.15) return "O / B (Blue-white)";
+  if (bv < 0.15) return "A (White)";
+  if (bv < 0.45) return "F (Yellow-white)";
+  if (bv < 0.8) return "G (Solar yellow)";
+  if (bv < 1.35) return "K (Orange)";
+  return "M (Red)";
+}
+
+/**
  * Compute Galactic coordinates (l, b) in degrees from equatorial J2000 (raDeg, decDeg)
  * to render the real Milky Way band across the celestial sphere.
  */
@@ -552,6 +571,12 @@ export const SKY_3D_COPY: Record<
     fovLabel: string;
     raLabel: string;
     decLabel: string;
+    unnamedStar: string;
+    magnitudeLabel: string;
+    distanceLabel: string;
+    spectralLabel: string;
+    centerOnStar: string;
+    starClickHint: string;
   }
 > = {
   en: {
@@ -586,6 +611,12 @@ export const SKY_3D_COPY: Record<
     fovLabel: "FOV",
     raLabel: "RA",
     decLabel: "Dec",
+    unnamedStar: "HYG Catalog Star",
+    magnitudeLabel: "Mag",
+    distanceLabel: "Distance",
+    spectralLabel: "Class",
+    centerOnStar: "Center",
+    starClickHint: "Hover or click any star",
   },
   es: {
     scales: {
@@ -619,5 +650,11 @@ export const SKY_3D_COPY: Record<
     fovLabel: "FOV",
     raLabel: "AR",
     decLabel: "Dec",
+    unnamedStar: "Estrella catálogo HYG",
+    magnitudeLabel: "Mag",
+    distanceLabel: "Distancia",
+    spectralLabel: "Clase",
+    centerOnStar: "Centrar",
+    starClickHint: "Pasa o haz clic en una estrella",
   },
 };

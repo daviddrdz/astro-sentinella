@@ -10,6 +10,7 @@ import {
 import * as THREE from "three";
 import {
   bvToRgb,
+  bvToSpectralClass,
   equatorialToCartesian,
   equatorialToGalacticDeg,
   loadHygStars,
@@ -48,6 +49,19 @@ interface ProjectedLabel {
   kind: "target" | "star" | "landmark";
   target?: Sky3DTarget;
   color?: string;
+}
+
+interface StarInspection {
+  name: string | null;
+  raDeg: number;
+  decDeg: number;
+  distPc: number;
+  mag: number;
+  ci: number;
+  spectralClass: string;
+  colorCss: string;
+  screenX: number;
+  screenY: number;
 }
 
 const STAR_VERTEX_SHADER = /* glsl */ `
@@ -604,8 +618,11 @@ export function Explorer3DCanvas({
   const [selectedTarget, setSelectedTarget] = useState<Sky3DTarget | null>(
     null
   );
+  const [hoveredStar, setHoveredStar] = useState<StarInspection | null>(null);
+  const [selectedStar, setSelectedStar] = useState<StarInspection | null>(null);
   const [hudFov, setHudFov] = useState<number>(SKY3D_CONSTANTS.defaultFovDeg);
   const [projectedLabels, setProjectedLabels] = useState<ProjectedLabel[]>([]);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
 
   const targetRaDeg = useMemo(
     () => parseSexagesimalRaDeg(query.ra),
@@ -628,6 +645,7 @@ export function Explorer3DCanvas({
     isDragging: boolean;
     lastX: number;
     lastY: number;
+    dragDistance: number;
   }>({
     yaw: 0,
     pitch: 0,
@@ -640,6 +658,7 @@ export function Explorer3DCanvas({
     isDragging: false,
     lastX: 0,
     lastY: 0,
+    dragDistance: 0,
   });
 
   const aimCameraAtSkyCoords = useCallback(
@@ -746,6 +765,7 @@ export function Explorer3DCanvas({
       SKY3D_CONSTANTS.cameraNear,
       SKY3D_CONSTANTS.cameraFar
     );
+    cameraRef.current = camera;
 
     const skyGroup = new THREE.Group();
     const milkyWayBand = createSkyMilkyWayBand();
@@ -1003,6 +1023,7 @@ export function Explorer3DCanvas({
       cancelAnimationFrame(rafId);
       resizeObserver.disconnect();
       if (cutoutTexture) cutoutTexture.dispose();
+      cameraRef.current = null;
       renderer.dispose();
       if (renderer.domElement.parentNode === container) {
         container.removeChild(renderer.domElement);
@@ -1022,36 +1043,149 @@ export function Explorer3DCanvas({
     copy.galacticCenter,
   ]);
 
+  const findNearestStarAtScreenPos = useCallback(
+    (clientX: number, clientY: number): StarInspection | null => {
+      const container = containerRef.current;
+      const camera = cameraRef.current;
+      if (!container || !camera || !hygData) return null;
+      if (scale !== "sky-view" && scale !== "neighborhood") return null;
+
+      const rect = container.getBoundingClientRect();
+      const px = clientX - rect.left;
+      const py = clientY - rect.top;
+      const w = rect.width;
+      const h = rect.height;
+      const hitSq =
+        SKY3D_CONSTANTS.starHitRadiusPx * SKY3D_CONSTANTS.starHitRadiusPx;
+      const vec = new THREE.Vector3();
+
+      let bestDistSq = hitSq;
+      let bestStar: {
+        name: string | null;
+        raDeg: number;
+        decDeg: number;
+        distPc: number;
+        mag: number;
+        ci: number;
+        sx: number;
+        sy: number;
+      } | null = null;
+
+      const projectCoords = (
+        raDeg: number,
+        decDeg: number,
+        distPc: number
+      ): [number, number] | null => {
+        const radius =
+          scale === "sky-view"
+            ? SKY3D_CONSTANTS.skySphereRadius
+            : Math.min(distPc, SKY3D_CONSTANTS.neighborhoodMaxDistPc) *
+              SKY3D_CONSTANTS.neighborhoodSceneScalePerPc;
+        const [wx, wy, wz] = equatorialToCartesian(raDeg, decDeg, radius);
+        vec.set(wx, wy, wz).project(camera);
+        if (vec.z > 1) return null;
+        return [(vec.x * R.half + R.half) * w, (-vec.y * R.half + R.half) * h];
+      };
+
+      for (const [raDeg, decDeg, distPc, mag, ci] of hygData.stars) {
+        const pt = projectCoords(raDeg, decDeg, distPc);
+        if (!pt) continue;
+        const dx = pt[0] - px;
+        const dy = pt[1] - py;
+        const dSq = dx * dx + dy * dy;
+        if (dSq < bestDistSq) {
+          bestDistSq = dSq;
+          bestStar = {
+            name: null,
+            raDeg,
+            decDeg,
+            distPc,
+            mag,
+            ci,
+            sx: pt[0],
+            sy: pt[1],
+          };
+        }
+      }
+
+      if (!bestStar) return null;
+
+      for (const [name, nRa, nDec] of hygData.named) {
+        if (
+          Math.abs(nRa - bestStar.raDeg) < R.namedStarMatchToleranceDeg &&
+          Math.abs(nDec - bestStar.decDeg) < R.namedStarMatchToleranceDeg
+        ) {
+          bestStar.name = name;
+          break;
+        }
+      }
+
+      const [r, g, b] = bvToRgb(bestStar.ci);
+      return {
+        name: bestStar.name,
+        raDeg: bestStar.raDeg,
+        decDeg: bestStar.decDeg,
+        distPc: bestStar.distPc,
+        mag: bestStar.mag,
+        ci: bestStar.ci,
+        spectralClass: bvToSpectralClass(bestStar.ci),
+        colorCss: `rgb(${Math.round(r * R.rgbScale)}, ${Math.round(g * R.rgbScale)}, ${Math.round(b * R.rgbScale)})`,
+        screenX: bestStar.sx,
+        screenY: bestStar.sy,
+      };
+    },
+    [hygData, scale]
+  );
+
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     camStateRef.current.isDragging = true;
     camStateRef.current.lastX = e.clientX;
     camStateRef.current.lastY = e.clientY;
+    camStateRef.current.dragDistance = 0;
     e.currentTarget.setPointerCapture(e.pointerId);
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const st = camStateRef.current;
-    if (!st.isDragging) return;
+    if (!st.isDragging) {
+      const hit = findNearestStarAtScreenPos(e.clientX, e.clientY);
+      setHoveredStar(hit);
+      return;
+    }
+
     const dx = e.clientX - st.lastX;
     const dy = e.clientY - st.lastY;
     st.lastX = e.clientX;
     st.lastY = e.clientY;
+    st.dragDistance += Math.hypot(dx, dy);
+    if (st.dragDistance > SKY3D_CONSTANTS.clickDragThresholdPx) {
+      setHoveredStar(null);
+    }
 
     const sign = scale === "sky-view" ? 1 : -1;
-    st.targetYaw += dx * SKY3D_CONSTANTS.dragSensitivity * sign;
+    const fovScale =
+      scale === "sky-view" ? st.fov / SKY3D_CONSTANTS.defaultFovDeg : 1;
+    const sens = SKY3D_CONSTANTS.dragSensitivity * fovScale * sign;
+    st.targetYaw += dx * sens;
     st.targetPitch = Math.max(
       SKY3D_CONSTANTS.minPitchRad,
-      Math.min(
-        SKY3D_CONSTANTS.maxPitchRad,
-        st.targetPitch + dy * SKY3D_CONSTANTS.dragSensitivity * sign
-      )
+      Math.min(SKY3D_CONSTANTS.maxPitchRad, st.targetPitch + dy * sens)
     );
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    const wasClick =
+      camStateRef.current.dragDistance <= SKY3D_CONSTANTS.clickDragThresholdPx;
     camStateRef.current.isDragging = false;
     if (e.currentTarget.hasPointerCapture(e.pointerId)) {
       e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+    if (wasClick) {
+      const hit = findNearestStarAtScreenPos(e.clientX, e.clientY);
+      if (hit) {
+        setSelectedTarget(null);
+        setSelectedStar(hit);
+      }
     }
   };
 
@@ -1091,6 +1225,7 @@ export function Explorer3DCanvas({
   };
 
   const handleSelectTarget = (target: Sky3DTarget) => {
+    setSelectedStar(null);
     setSelectedTarget(target);
     if (scale !== "sky-view") {
       setScale("sky-view");
@@ -1111,11 +1246,12 @@ export function Explorer3DCanvas({
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onPointerLeave={() => setHoveredStar(null)}
       onWheel={handleWheel}
     >
       <div
         ref={containerRef}
-        className="absolute inset-0 cursor-grab active:cursor-grabbing"
+        className={`absolute inset-0 ${hoveredStar ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"}`}
       />
 
       {webglUnavailable && (
@@ -1268,6 +1404,89 @@ export function Explorer3DCanvas({
         )}
       </div>
 
+      {hoveredStar && (
+        <div
+          style={{
+            left: hoveredStar.screenX + R.tooltipOffsetX,
+            top: hoveredStar.screenY - R.tooltipOffsetY,
+          }}
+          className="pointer-events-none absolute z-20 rounded-lg border border-cyan-400/35 bg-slate-950/90 px-2.5 py-1.5 text-[11px] text-slate-100 shadow-lg backdrop-blur-md"
+        >
+          <div className="flex items-center gap-1.5 font-medium">
+            <span
+              className="h-2 w-2 rounded-full"
+              style={{ backgroundColor: hoveredStar.colorCss }}
+            />
+            <span>{hoveredStar.name ?? copy.unnamedStar}</span>
+          </div>
+          <div className="mt-0.5 font-mono text-[10px] text-slate-300">
+            {copy.magnitudeLabel} {hoveredStar.mag.toFixed(R.two)} ·{" "}
+            {Math.round(hoveredStar.distPc * SKY3D_CONSTANTS.pcToLy)} ly ·{" "}
+            {hoveredStar.spectralClass}
+          </div>
+        </div>
+      )}
+
+      {selectedStar && (
+        <div
+          data-testid="selected-star-card"
+          className="absolute right-4 bottom-20 z-20 w-68 rounded-xl border border-cyan-400/35 bg-slate-950/90 p-3 text-xs text-slate-200 shadow-xl backdrop-blur-md"
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span
+                className="h-3 w-3 shrink-0 rounded-full ring-2 ring-white/20"
+                style={{ backgroundColor: selectedStar.colorCss }}
+              />
+              <div>
+                <div className="font-semibold text-cyan-200">
+                  {selectedStar.name ?? copy.unnamedStar}
+                </div>
+                <div className="text-[11px] text-slate-400">
+                  {copy.spectralLabel}: {selectedStar.spectralClass}
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedStar(null)}
+              className="text-slate-400 hover:text-white"
+              aria-label="Close star card"
+            >
+              ×
+            </button>
+          </div>
+          <div className="mt-2 space-y-0.5 font-mono text-[10px] text-slate-300">
+            <div>
+              {copy.magnitudeLabel}: {selectedStar.mag.toFixed(R.two)}
+            </div>
+            <div>
+              {copy.distanceLabel}:{" "}
+              {Math.round(selectedStar.distPc * SKY3D_CONSTANTS.pcToLy)} ly (
+              {selectedStar.distPc.toFixed(1)} pc)
+            </div>
+            <div>
+              {copy.raLabel}: {selectedStar.raDeg.toFixed(R.three)}° ·{" "}
+              {copy.decLabel}: {selectedStar.decDeg.toFixed(R.three)}°
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() =>
+              aimCameraAtSkyCoords(
+                selectedStar.raDeg,
+                selectedStar.decDeg,
+                SKY3D_CONSTANTS.telescopeFovDeg
+              )
+            }
+            className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-cyan-400/35 bg-cyan-500/15 px-2.5 py-1 text-[11px] font-medium text-cyan-200 transition hover:bg-cyan-500/25"
+          >
+            <Crosshair className="h-3 w-3" />
+            <span>{copy.centerOnStar}</span>
+          </button>
+        </div>
+      )}
+
       {selectedTarget && (
         <div className="absolute right-4 bottom-20 w-64 rounded-xl border border-cyan-400/30 bg-slate-950/85 p-3 text-xs text-slate-200 shadow-xl backdrop-blur-md">
           <div className="flex items-start justify-between gap-2">
@@ -1332,6 +1551,8 @@ export function Explorer3DCanvas({
         </div>
         <div className="text-[10px] text-slate-400">
           {copy.scaleSubtitles[scale]} · {copy.dragHint} · {copy.scrollHint}
+          {(scale === "sky-view" || scale === "neighborhood") &&
+            ` · ${copy.starClickHint}`}
         </div>
       </div>
     </div>
