@@ -177,6 +177,8 @@ export const EXPLORER_COPY: Record<
     startCompare: string;
     cancelCompare: string;
     compareSelectingHint: string;
+    view2D: string;
+    view3D: string;
   }
 > = {
   en: {
@@ -241,6 +243,8 @@ export const EXPLORER_COPY: Record<
     startCompare: "Compare 2 frames",
     cancelCompare: "Cancel",
     compareSelectingHint: "Click 2 frames in the timeline to select them.",
+    view2D: "2D",
+    view3D: "3D",
   },
   es: {
     backToPortal: "Volver al Portal",
@@ -304,6 +308,8 @@ export const EXPLORER_COPY: Record<
     cancelCompare: "Cancelar",
     compareSelectingHint:
       "Haz clic en 2 fotogramas de la línea de tiempo para seleccionarlos.",
+    view2D: "2D",
+    view3D: "3D",
   },
 };
 

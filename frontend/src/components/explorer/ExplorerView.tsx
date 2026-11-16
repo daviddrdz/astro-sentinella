@@ -21,6 +21,7 @@ import type {
   ExplorerLocale,
   ExplorerSnapshot,
   ExplorerToolId,
+  ExplorerViewMode,
   SpectrumState,
   SubtractionResult,
   TimelineFilterTab,
@@ -28,6 +29,7 @@ import type {
 import type { QueryParams } from "../../types/portal";
 import { DocsModal } from "../DocsModal";
 import { CompareInspector } from "./CompareInspector";
+import { Explorer3DCanvas } from "./Explorer3DCanvas";
 import { ExplorerCanvas } from "./ExplorerCanvas";
 import { ExplorerTimeline } from "./ExplorerTimeline";
 import { ExplorerToolbar } from "./ExplorerToolbar";
@@ -95,6 +97,7 @@ function restrictLayers(
 
 export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
   const [locale, setLocale] = useState<ExplorerLocale>("en");
+  const [viewMode, setViewMode] = useState<ExplorerViewMode>("2d");
   const [layers, setLayers] = useState<ExplorerLayer[]>(() =>
     cloneLayers([...DEFAULT_EXPLORER_LAYERS])
   );
@@ -529,6 +532,8 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
       <ExplorerTopBar
         query={query}
         locale={locale}
+        viewMode={viewMode}
+        onChangeViewMode={setViewMode}
         canUndo={undoStack.length > EXPLORER_CONFIG.firstIndex}
         canRedo={redoStack.length > EXPLORER_CONFIG.firstIndex}
         onBackToPortal={onBackToPortal}
@@ -548,27 +553,36 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
           onSelectTool={handleSelectTool}
         />
 
-        <ExplorerCanvas
-          query={query}
-          layers={layers}
-          activeFrame={activeFrame}
-          activeSubtraction={activeSubtraction}
-          activeTool={activeTool}
-          zoomLevel={zoomLevel}
-          panOffset={panOffset}
-          locale={locale}
-          onPanChange={setPanOffset}
-          onZoomChange={setZoomLevel}
-          onCanvasClick={handleCanvasClick}
-          spectrumGrid={spectrumGrid}
-          selectedChunk={
-            spectrum.status === "loaded" ? spectrum.data.chunk.bounds : null
-          }
-          pendingChunkClick={
-            spectrum.status === "loading" ? spectrum.pending : null
-          }
-          onChunkSelect={handleChunkSelect}
-        />
+        {viewMode === "3d" ? (
+          <Explorer3DCanvas
+            query={query}
+            activeFrame={activeFrame}
+            activeSubtraction={activeSubtraction}
+            locale={locale}
+          />
+        ) : (
+          <ExplorerCanvas
+            query={query}
+            layers={layers}
+            activeFrame={activeFrame}
+            activeSubtraction={activeSubtraction}
+            activeTool={activeTool}
+            zoomLevel={zoomLevel}
+            panOffset={panOffset}
+            locale={locale}
+            onPanChange={setPanOffset}
+            onZoomChange={setZoomLevel}
+            onCanvasClick={handleCanvasClick}
+            spectrumGrid={spectrumGrid}
+            selectedChunk={
+              spectrum.status === "loaded" ? spectrum.data.chunk.bounds : null
+            }
+            pendingChunkClick={
+              spectrum.status === "loading" ? spectrum.pending : null
+            }
+            onChunkSelect={handleChunkSelect}
+          />
+        )}
 
         {showSpectrumPanel && (
           <SpectrumPanel

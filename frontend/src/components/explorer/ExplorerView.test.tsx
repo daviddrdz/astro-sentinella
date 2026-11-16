@@ -169,4 +169,80 @@ describe("ExplorerView", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Línea de tiempo")).toBeInTheDocument();
   });
+
+  it("toggles between 2D and 3D views and switches 3D space scales", () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(null, { status: 404 })
+    );
+
+    render(<ExplorerView query={SAMPLE_QUERY} onBackToPortal={vi.fn()} />);
+
+    const btn3D = screen.getByRole("button", { name: "3D" });
+    fireEvent.click(btn3D);
+
+    expect(screen.getByTestId("explorer-3d-canvas")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Sky View" })).toHaveAttribute(
+      "aria-selected",
+      "true"
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Neighborhood" }));
+    expect(screen.getByRole("tab", { name: "Neighborhood" })).toHaveAttribute(
+      "aria-selected",
+      "true"
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Milky Way" }));
+    expect(screen.getByRole("tab", { name: "Milky Way" })).toHaveAttribute(
+      "aria-selected",
+      "true"
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Solar System" }));
+    expect(screen.getByRole("tab", { name: "Solar System" })).toHaveAttribute(
+      "aria-selected",
+      "true"
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "2D" }));
+    expect(screen.queryByTestId("explorer-3d-canvas")).not.toBeInTheDocument();
+  });
+
+  it("toggles between 2D and 3D views and switches 3D space scales", () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(null, { status: 404 })
+    );
+
+    render(<ExplorerView query={SAMPLE_QUERY} onBackToPortal={vi.fn()} />);
+
+    const btn3D = screen.getByRole("button", { name: "3D" });
+    fireEvent.click(btn3D);
+
+    expect(screen.getByTestId("explorer-3d-canvas")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Sky View" })).toHaveAttribute(
+      "aria-selected",
+      "true"
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Neighborhood" }));
+    expect(screen.getByRole("tab", { name: "Neighborhood" })).toHaveAttribute(
+      "aria-selected",
+      "true"
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Milky Way" }));
+    expect(screen.getByRole("tab", { name: "Milky Way" })).toHaveAttribute(
+      "aria-selected",
+      "true"
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Solar System" }));
+    expect(screen.getByRole("tab", { name: "Solar System" })).toHaveAttribute(
+      "aria-selected",
+      "true"
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "2D" }));
+    expect(screen.queryByTestId("explorer-3d-canvas")).not.toBeInTheDocument();
+  });
 });

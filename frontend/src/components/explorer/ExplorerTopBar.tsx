@@ -10,12 +10,14 @@ import {
 } from "lucide-react";
 import { APP_CONFIG, ICON_SIZES } from "../../config/app";
 import { EXPLORER_CONFIG, EXPLORER_COPY } from "../../config/explorer";
-import type { ExplorerLocale } from "../../types/explorer";
+import type { ExplorerLocale, ExplorerViewMode } from "../../types/explorer";
 import type { QueryParams } from "../../types/portal";
 
 interface ExplorerTopBarProps {
   query: QueryParams;
   locale: ExplorerLocale;
+  viewMode?: ExplorerViewMode;
+  onChangeViewMode?: (mode: ExplorerViewMode) => void;
   canUndo: boolean;
   canRedo: boolean;
   onBackToPortal: () => void;
@@ -38,6 +40,8 @@ function formatFieldSizeArcmin(fieldSizeDeg: string): string {
 export function ExplorerTopBar({
   query,
   locale,
+  viewMode = "2d",
+  onChangeViewMode,
   canUndo,
   canRedo,
   onBackToPortal,
@@ -107,6 +111,33 @@ export function ExplorerTopBar({
         >
           <Redo2 size={EXPLORER_CONFIG.iconSizeMd} aria-hidden="true" />
         </button>
+
+        {onChangeViewMode && (
+          <div
+            className="flex items-center rounded-md border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-elevated)] p-0.5"
+            role="group"
+            aria-label="View mode"
+          >
+            {(["2d", "3d"] as const).map((mode) => {
+              const active = viewMode === mode;
+              return (
+                <button
+                  key={mode}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => onChangeViewMode(mode)}
+                  className={`rounded px-2 py-0.5 text-[11px] font-medium transition ${
+                    active
+                      ? "bg-[var(--ae-accent-primary)] text-slate-950"
+                      : "text-[var(--ae-text-secondary)] hover:text-[var(--ae-text-primary)]"
+                  }`}
+                >
+                  {mode === "2d" ? copy.view2D : copy.view3D}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         <div className="mx-1 h-4 w-px bg-[var(--ae-border-subtle)]" />
 
