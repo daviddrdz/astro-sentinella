@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { AlertTriangle, ChartSpline, Loader2, X } from "lucide-react";
 import {
   EXPLORER_CONFIG,
@@ -5,13 +6,26 @@ import {
   SPECTRUM_CHART,
   SPECTRUM_FORMAT,
 } from "../../config/explorer";
-import type { ExplorerLocale, SpectrumState } from "../../types/explorer";
+import type {
+  ChunkSpectrum,
+  ExplorerLocale,
+  SpectrumState,
+} from "../../types/explorer";
 import { formatFlux } from "../../utils/spectrum";
 import { SpectrumChart } from "./SpectrumChart";
 
+const PERCENT_MULT = 100;
+const ONE_DEC = 1;
 // Typography straight from styles/tokens.css (SSOT, >= 14px).
 const TEXT_SM = "text-[length:var(--ae-text-sm)]";
 const FONT_MONO = "font-[family-name:var(--ae-font-mono)]";
+
+function peakFlux(spectrum: ChunkSpectrum): number | null {
+  const valid = spectrum.points
+    .map((p) => p.flux)
+    .filter((f): f is number => f !== null);
+  return valid.length > 0 ? Math.max(...valid) : null;
+}
 
 interface SpectrumPanelProps {
   state: SpectrumState;
@@ -21,6 +35,16 @@ interface SpectrumPanelProps {
 
 export function SpectrumPanel({ state, locale, onClose }: SpectrumPanelProps) {
   const copy = EXPLORER_COPY[locale];
+  const [pinnedRef, setPinnedRef] = useState<ChunkSpectrum | null>(null);
+
+  const currentPeak = state.status === "loaded" ? peakFlux(state.data) : null;
+  const refPeak = pinnedRef ? peakFlux(pinnedRef) : null;
+  const deltaPeak =
+    currentPeak !== null && refPeak !== null ? currentPeak - refPeak : null;
+  const deltaPct =
+    deltaPeak !== null && refPeak !== null && refPeak !== 0
+      ? (deltaPeak / Math.abs(refPeak)) * PERCENT_MULT
+      : null;
 
   return (
     <aside
@@ -104,6 +128,63 @@ export function SpectrumPanel({ state, locale, onClose }: SpectrumPanelProps) {
               wavelengthLabel={copy.spectrumWavelength}
               fluxLabel={copy.spectrumFlux}
             />
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPinnedRef(state.data)}
+                className={`rounded-[var(--ae-radius-sm)] border border-[var(--ae-border-strong)] bg-[var(--ae-bg-elevated)] px-2.5 py-1 ${TEXT_SM} font-medium text-[var(--ae-text-primary)] transition hover:bg-[var(--ae-bg-hover)]`}
+              >
+                {copy.spectrumPinRef}
+              </button>
+              {pinnedRef && (
+                <button
+                  type="button"
+                  onClick={() => setPinnedRef(null)}
+                  className={`${TEXT_SM} text-[var(--ae-text-muted)] hover:text-[var(--ae-text-primary)]`}
+                >
+                  {copy.spectrumClearRef}
+                </button>
+              )}
+            </div>
+
+            {pinnedRef && (
+              <div
+                className={`rounded-[var(--ae-radius-md)] border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-elevated)] p-2.5 ${TEXT_SM}`}
+              >
+                <div className="mb-1.5 font-semibold text-[var(--ae-text-primary)]">
+                  {copy.spectrumCompareHeader}
+                </div>
+                <dl
+                  className={`space-y-1 ${FONT_MONO} text-[var(--ae-text-secondary)]`}
+                >
+                  <div className="flex justify-between">
+                    <dt className="text-[var(--ae-text-muted)]">
+                      {copy.spectrumRefA}
+                    </dt>
+                    <dd>{refPeak === null ? "—" : formatFlux(refPeak)}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-[var(--ae-text-muted)]">
+                      {copy.spectrumCurrentB}
+                    </dt>
+                    <dd>
+                      {currentPeak === null ? "—" : formatFlux(currentPeak)}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-[var(--ae-text-muted)]">
+                      {copy.spectrumDelta}
+                    </dt>
+                    <dd className="text-[var(--ae-accent-primary)]">
+                      {deltaPeak === null
+                        ? "—"
+                        : `${deltaPeak >= 0 ? "+" : ""}${formatFlux(deltaPeak)}${deltaPct !== null ? ` (${deltaPct >= 0 ? "+" : ""}${deltaPct.toFixed(ONE_DEC)}%)` : ""}`}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+            )}
 
             <p
               className={`${TEXT_SM} leading-relaxed text-[var(--ae-text-muted)]`}

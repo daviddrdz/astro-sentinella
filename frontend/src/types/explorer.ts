@@ -1,4 +1,7 @@
+import type { FrameComparisonMetrics } from "../utils/frameMetrics";
+
 export type ExplorerLocale = "en" | "es";
+export type ExplorerViewMode = "2d" | "3d";
 
 export type ExplorerToolId = "hand" | "subtract" | "spectrum" | "reset";
 
@@ -85,4 +88,5 @@ export interface SubtractionResult {
   imageUrl?: string;
   summary?: string;
   errorMessage?: string;
+  metrics?: FrameComparisonMetrics | null;
 }

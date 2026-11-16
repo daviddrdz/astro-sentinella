@@ -177,17 +177,134 @@ describe("ExplorerView", () => {
     expect(within(timeline).getByText("5 / 8")).toBeInTheDocument();
   });
 
-  it("switches language between EN and ES", () => {
+  it("toggles between 2D and 3D views and toggles 3D sky overlays", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(null, { status: 404 })
     );
 
     render(<ExplorerView query={SAMPLE_QUERY} onBackToPortal={vi.fn()} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Toggle language" }));
+    const btn3D = screen.getByRole("button", { name: "3D" });
+    fireEvent.click(btn3D);
+
+    expect(screen.getByTestId("explorer-3d-canvas")).toBeInTheDocument();
+    const deepSkyBtn = screen.getByRole("button", { name: "Deep Sky" });
+    expect(deepSkyBtn).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(deepSkyBtn);
+    expect(deepSkyBtn).toHaveAttribute("aria-pressed", "false");
+
+    const planetsBtn = screen.getByRole("button", { name: "Planets" });
+    expect(planetsBtn).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(planetsBtn);
+    expect(planetsBtn).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(screen.getByRole("button", { name: "2D" }));
+    expect(screen.queryByTestId("explorer-3d-canvas")).not.toBeInTheDocument();
+  });
+
+  it("inspects a celestial target in the 3D right sidebar and syncs coordinates with 2D", () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(null, { status: 404 })
+    );
+
+    render(<ExplorerView query={SAMPLE_QUERY} onBackToPortal={vi.fn()} />);
+
     expect(
-      screen.getByRole("heading", { name: "Comparar" })
+      screen.queryByTestId("sky-object-inspector")
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "3D" }));
+
+    const inspector = screen.getByTestId("sky-object-inspector");
+    fireEvent.click(
+      within(inspector).getByRole("button", { name: "WISE 0855" })
+    );
+
+    expect(screen.getByTestId("inspector-selected-object")).toBeInTheDocument();
+
+    fireEvent.click(
+      within(inspector).getByRole("button", { name: "Load in 2D & 3D" })
+    );
+
+    expect(
+      within(inspector).getByText("RA: 08h 55m 10.831s")
     ).toBeInTheDocument();
-    expect(screen.getByText("Línea de tiempo")).toBeInTheDocument();
+    expect(
+      within(inspector).getByText("Dec: -07° 14' 42.53\"")
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "2D" }));
+    expect(
+      screen.queryByTestId("sky-object-inspector")
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByText(/08h 55m 10\.831s/).length).toBeGreaterThan(0);
+  });
+
+  it("updates the active frame in 3D view when stepping the timeline player", () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(null, { status: 404 })
+    );
+
+    render(<ExplorerView query={SAMPLE_QUERY} onBackToPortal={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "3D" }));
+    expect(screen.getByTestId("hud-active-frame")).toHaveTextContent(
+      "18:40Z | 1"
+    );
+
+    const timeline = screen.getByRole("region", { name: "Timeline" });
+    fireEvent.click(
+      within(timeline).getByRole("button", { name: "Next frame" })
+    );
+
+    expect(screen.getByTestId("hud-active-frame")).toHaveTextContent(
+      "18:50Z | 1"
+    );
+  });
+
+  it("measures angular and 3D separation between two celestial objects in 3D inspector", () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(null, { status: 404 })
+    );
+
+    render(<ExplorerView query={SAMPLE_QUERY} onBackToPortal={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "3D" }));
+    const inspector = screen.getByTestId("sky-object-inspector");
+
+    fireEvent.click(
+      within(inspector).getByRole("button", { name: "WISE 0855" })
+    );
+    fireEvent.click(
+      within(inspector).getByRole("button", { name: "Measure from here" })
+    );
+    fireEvent.click(
+      within(inspector).getByRole("button", { name: "Barnard's Star" })
+    );
+
+    const card = screen.getByTestId("sky-measurement-card");
+    expect(card).toHaveTextContent("WISE 0855");
+    expect(card).toHaveTextContent("°");
+    expect(card).toHaveTextContent("ly");
+  });
+
+  it("keeps surrounding sky sectors visible across zoom levels up to a 5x5 matrix in 2D", () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(null, { status: 404 })
+    );
+
+    render(<ExplorerView query={SAMPLE_QUERY} onBackToPortal={vi.fn()} />);
+
+    const viewport = screen.getByRole("region", { name: "Telescope viewport" });
+    expect(screen.getByTestId("surrounding-sectors")).toBeInTheDocument();
+    expect(screen.getByTestId("sector-warning--1:-1")).toBeInTheDocument();
+
+    fireEvent.wheel(viewport, { deltaY: 200 });
+    expect(screen.getByTestId("sector-warning--2:-2")).toBeInTheDocument();
+
+    fireEvent.wheel(viewport, { deltaY: -400 });
+    expect(screen.getByTestId("surrounding-sectors")).toBeInTheDocument();
+    expect(screen.getByTestId("sector-warning--1:-1")).toBeInTheDocument();
   });
 });

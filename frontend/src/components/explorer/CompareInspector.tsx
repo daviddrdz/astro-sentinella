@@ -250,10 +250,32 @@ export function CompareInspector({
                   )}
 
                   {resta.status === "ready" && (
-                    <div className="truncate text-xs text-[var(--ae-text-muted)]">
-                      {resta.summary ??
-                        `Band ${resta.frameA.band} - Band ${resta.frameB.band}`}
-                    </div>
+                    <>
+                      <div className="truncate text-xs text-[var(--ae-text-muted)]">
+                        {resta.summary ??
+                          `Band ${resta.frameA.band} - Band ${resta.frameB.band}`}
+                      </div>
+                      {resta.metrics && (
+                        <div className="mt-1 grid grid-cols-2 gap-x-2 gap-y-1 rounded border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-base)] px-2 py-1.5 font-mono text-xs text-[var(--ae-text-secondary)]">
+                          <span>
+                            {copy.metricDeltaMean}:{" "}
+                            {resta.metrics.deltaMeanPct >= 0 ? "+" : ""}
+                            {resta.metrics.deltaMeanPct.toFixed(1)}%
+                          </span>
+                          <span>
+                            {copy.metricMaxDiff}:{" "}
+                            {Math.round(resta.metrics.maxDiff)}
+                          </span>
+                          <span>
+                            {copy.metricRms}: {resta.metrics.rmsDiff.toFixed(1)}
+                          </span>
+                          <span>
+                            {copy.metricChanged}:{" "}
+                            {resta.metrics.changedPct.toFixed(1)}%
+                          </span>
+                        </div>
+                      )}
+                    </>
                   )}
 
                   {resta.status === "error" && (

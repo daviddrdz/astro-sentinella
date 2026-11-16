@@ -24,7 +24,7 @@ export const EXPLORER_CONFIG = {
   opacityMax: 100,
   opacityStep: 1,
   defaultNewLayerOpacity: 80,
-  zoomMin: 0.5,
+  zoomMin: 0.35,
   zoomMax: 4,
   zoomDefault: 1,
   dragThresholdPx: 4,
@@ -174,6 +174,21 @@ export const EXPLORER_COPY: Record<
     startCompare: string;
     cancelCompare: string;
     compareSelectingHint: string;
+    view2D: string;
+    view3D: string;
+    metricDeltaMean: string;
+    metricMaxDiff: string;
+    metricRms: string;
+    metricChanged: string;
+    spectrumPinRef: string;
+    spectrumClearRef: string;
+    spectrumCompareHeader: string;
+    spectrumRefA: string;
+    spectrumCurrentB: string;
+    spectrumDelta: string;
+    rulerHint: string;
+    rulerSeparation: string;
+    sectorNotFoundForDate: string;
   }
 > = {
   en: {
@@ -238,6 +253,21 @@ export const EXPLORER_COPY: Record<
     startCompare: "Compare 2 frames",
     cancelCompare: "Cancel",
     compareSelectingHint: "Click 2 frames in the timeline to select them.",
+    view2D: "2D",
+    view3D: "3D",
+    metricDeltaMean: "Mean Δ",
+    metricMaxDiff: "Peak Δ",
+    metricRms: "RMS",
+    metricChanged: "Changed",
+    spectrumPinRef: "Pin as Ref A",
+    spectrumClearRef: "Clear Ref A",
+    spectrumCompareHeader: "Spectrum A vs B",
+    spectrumRefA: "Ref A peak",
+    spectrumCurrentB: "Current B peak",
+    spectrumDelta: "Δ Peak (B - A)",
+    rulerHint: "Click two points on the image to measure angular separation.",
+    rulerSeparation: "Separation",
+    sectorNotFoundForDate: "No frame on this date",
   },
   es: {
     backToPortal: "Volver al Portal",
@@ -301,6 +331,21 @@ export const EXPLORER_COPY: Record<
     cancelCompare: "Cancelar",
     compareSelectingHint:
       "Haz clic en 2 fotogramas de la línea de tiempo para seleccionarlos.",
+    view2D: "2D",
+    view3D: "3D",
+    metricDeltaMean: "Δ Media",
+    metricMaxDiff: "Pico Δ",
+    metricRms: "RMS",
+    metricChanged: "Cambio",
+    spectrumPinRef: "Fijar Ref A",
+    spectrumClearRef: "Quitar Ref A",
+    spectrumCompareHeader: "Espectro A vs B",
+    spectrumRefA: "Pico Ref A",
+    spectrumCurrentB: "Pico actual B",
+    spectrumDelta: "Δ Pico (B - A)",
+    rulerHint: "Haz clic en dos puntos para medir la separación angular.",
+    rulerSeparation: "Separación",
+    sectorNotFoundForDate: "Sin fotograma en esta fecha",
   },
 };
 

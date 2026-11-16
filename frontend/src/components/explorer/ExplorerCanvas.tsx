@@ -15,6 +15,23 @@ import type {
 } from "../../types/explorer";
 import type { QueryParams } from "../../types/portal";
 import { clamp01, containedBox, type Size } from "../../utils/spectrum";
+import {
+  formatDecSexagesimal,
+  formatRaSexagesimal,
+  parseSexagesimalDecDeg,
+  parseSexagesimalRaDeg,
+  SKY3D_CONSTANTS,
+} from "../../config/sky3dCatalog";
+
+const DEFAULT_FIELD_SIZE_DEG = 0.5;
+const RULER_PCT = 100;
+const ZOOM_OUT_OUTER_RING_THRESHOLD = 0.92;
+const TILE_OUTER_RADIUS = 2;
+const TILE_OFFSETS = [-TILE_OUTER_RADIUS, -1, 0, 1, TILE_OUTER_RADIUS] as const;
+const TILE_INNER_RADIUS = 1;
+const MIN_COS_DEC = 0.15;
+const MAX_ABS_DEC_DEG = 89.5;
+const FULL_CIRCLE_DEG = 360;
 
 interface ExplorerCanvasProps {
   query: QueryParams;
@@ -100,6 +117,11 @@ export function ExplorerCanvas({
 }: ExplorerCanvasProps) {
   const copy = EXPLORER_COPY[locale];
   const visibleLayers = layers.filter((layer) => layer.visible);
+  const primaryLayer = visibleLayers[0] ?? layers[0];
+  const primaryTint = primaryLayer?.tint ?? "grey";
+  const primaryOpacity = primaryLayer
+    ? primaryLayer.opacity / EXPLORER_CONFIG.opacityMax
+    : 1;
   const scaleArcmin = (EXPLORER_CONFIG.defaultScaleArcmin / zoomLevel).toFixed(
     EXPLORER_CONFIG.firstIndex
   );
@@ -130,6 +152,11 @@ export function ExplorerCanvas({
     row: number;
     col: number;
   } | null>(null);
+  const [tileStatus, setTileStatus] = useState<
+    Record<string, "loading" | "loaded" | "error">
+  >({});
+
+  const showSurroundingSectors = !activeSubtraction;
 
   // Unscaled layout size of the frame box; the zoom transform is applied on top.
   useEffect(() => {
@@ -162,6 +189,83 @@ export function ExplorerCanvas({
   const primaryStatus = primaryKey
     ? (statusByUrl[primaryKey] ?? "loading")
     : "loaded";
+
+  const rawTimestamp = activeFrame?.timestamp?.trim() ?? "";
+  const isIsoDate = /^\d{4}-\d{2}-\d{2}$/.test(rawTimestamp);
+  const obsDateForTiles = isIsoDate
+    ? rawTimestamp
+    : query.observationDate.trim();
+  const canLoadNeighborTiles = !primaryUrl || primaryStatus === "loaded";
+  const maxRing =
+    zoomLevel < ZOOM_OUT_OUTER_RING_THRESHOLD
+      ? TILE_OFFSETS[TILE_OFFSETS.length - 1]
+      : TILE_INNER_RADIUS;
+
+  const surroundingTiles = showSurroundingSectors
+    ? (() => {
+        const centerRa = parseSexagesimalRaDeg(query.ra);
+        const centerDec = parseSexagesimalDecDeg(query.dec);
+        const fieldDeg = Number(query.fieldSizeDeg) || DEFAULT_FIELD_SIZE_DEG;
+        const cosDec = Math.max(
+          MIN_COS_DEC,
+          Math.cos(centerDec * SKY3D_CONSTANTS.degToRad)
+        );
+        const isRemoteSource =
+          Boolean(primaryUrl) &&
+          (primaryUrl!.includes("/image") ||
+            primaryUrl!.startsWith("/api/") ||
+            primaryUrl!.startsWith("http"));
+        const tiles: Array<{
+          key: string;
+          statusKey: string;
+          col: number;
+          row: number;
+          raDisplay: string;
+          decDisplay: string;
+          imageUrl: string | null;
+        }> = [];
+        for (const row of TILE_OFFSETS) {
+          for (const col of TILE_OFFSETS) {
+            if (col === 0 && row === 0) continue;
+            if (Math.abs(col) > maxRing || Math.abs(row) > maxRing) continue;
+            const nDec = Math.max(
+              -MAX_ABS_DEC_DEG,
+              Math.min(MAX_ABS_DEC_DEG, centerDec - row * fieldDeg)
+            );
+            const nRa =
+              (((centerRa - (col * fieldDeg) / cosDec) % FULL_CIRCLE_DEG) +
+                FULL_CIRCLE_DEG) %
+              FULL_CIRCLE_DEG;
+            const raDisplay = formatRaSexagesimal(nRa);
+            const decDisplay = formatDecSexagesimal(nDec);
+            let imageUrl: string | null = null;
+            if (canLoadNeighborTiles && isRemoteSource && obsDateForTiles) {
+              const params = new URLSearchParams({
+                ra: raDisplay,
+                dec: decDisplay,
+                fieldSizeDeg: String(fieldDeg),
+                observationDate: obsDateForTiles,
+              });
+              imageUrl = withColor(
+                `${EXPLORER_CONFIG.framesEndpoint}/image?${params.toString()}`,
+                primaryTint
+              );
+            }
+            const key = `${col}:${row}`;
+            tiles.push({
+              key,
+              statusKey: `${key}:${obsDateForTiles}:${primaryTint}`,
+              col,
+              row,
+              raDisplay,
+              decDisplay,
+              imageUrl,
+            });
+          }
+        }
+        return tiles;
+      })()
+    : [];
 
   useEffect(() => {
     if (!primaryKey || primaryStatus !== "loading") {
@@ -281,13 +385,95 @@ export function ExplorerCanvas({
       {/* Stacked photogram layers or Compare subtraction view */}
       <div
         ref={frameRef}
-        className={`relative h-[78%] w-[86%] max-w-3xl overflow-hidden rounded-lg border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-canvas)] shadow-2xl ${
-          isDragging ? "" : "transition-transform duration-200"
-        }`}
+        className={`relative aspect-square h-[78%] max-w-[86%] bg-[var(--ae-bg-canvas)] ${
+          showSurroundingSectors
+            ? "overflow-visible"
+            : "overflow-hidden rounded-lg border border-[var(--ae-border-subtle)] shadow-2xl"
+        } ${isDragging ? "" : "transition-transform duration-200"}`}
         style={{
           transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomLevel})`,
         }}
       >
+        {showSurroundingSectors && (
+          <div
+            data-testid="surrounding-sectors"
+            className="pointer-events-none"
+          >
+            {surroundingTiles.map((tile) => {
+              const status = tileStatus[tile.statusKey] ?? "loading";
+              const isErrorOrMissing =
+                status === "error" || (canLoadNeighborTiles && !tile.imageUrl);
+              return (
+                <div
+                  key={tile.key}
+                  style={{
+                    left: `${tile.col * RULER_PCT}%`,
+                    top: `${tile.row * RULER_PCT}%`,
+                    opacity: primaryOpacity,
+                  }}
+                  className="absolute h-full w-full overflow-hidden bg-[var(--ae-bg-canvas)]"
+                >
+                  {tile.imageUrl && status !== "error" && (
+                    <img
+                      src={tile.imageUrl}
+                      alt={`${tile.raDisplay} ${tile.decDisplay}`}
+                      loading="lazy"
+                      fetchPriority="low"
+                      onLoad={() =>
+                        setTileStatus((prev) => ({
+                          ...prev,
+                          [tile.statusKey]: "loaded",
+                        }))
+                      }
+                      onError={() =>
+                        setTileStatus((prev) => ({
+                          ...prev,
+                          [tile.statusKey]: "error",
+                        }))
+                      }
+                      className={`h-full w-full object-cover transition-opacity duration-200 ${
+                        status === "loaded" ? "opacity-100" : "opacity-0"
+                      }`}
+                    />
+                  )}
+                  {isErrorOrMissing && (
+                    <div
+                      data-testid={`sector-warning-${tile.key}`}
+                      className="flex h-full w-full flex-col items-center justify-center gap-1.5 bg-[var(--ae-bg-surface)]/45 px-3 text-center"
+                    >
+                      <AlertTriangle
+                        className="h-5 w-5 text-[var(--ae-status-warning)]"
+                        aria-hidden="true"
+                      />
+                      <span className="text-xs font-medium text-[var(--ae-text-muted)]">
+                        {copy.sectorNotFoundForDate}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Delineating grid lines and sector info overlaid ON TOP of seamless tiles */}
+            <div className="pointer-events-none absolute inset-0 z-10">
+              {surroundingTiles.map((tile) => (
+                <div
+                  key={`overlay-${tile.key}`}
+                  style={{
+                    left: `${tile.col * RULER_PCT}%`,
+                    top: `${tile.row * RULER_PCT}%`,
+                  }}
+                  className="absolute h-full w-full border border-[var(--ae-border-strong)]/60"
+                >
+                  <span className="absolute top-2 left-2 rounded bg-[var(--ae-bg-base)]/75 px-1.5 py-0.5 font-mono text-xs text-[var(--ae-text-secondary)]">
+                    {`${tile.raDisplay} ${tile.decDisplay}`}
+                  </span>
+                </div>
+              ))}
+              <div className="absolute inset-0 border border-[var(--ae-accent-primary)]/70" />
+            </div>
+          </div>
+        )}
         {activeSubtraction ? (
           <div className="relative flex h-full w-full items-center justify-center bg-[var(--ae-bg-elevated)]/40 p-4">
             <div className="pointer-events-none absolute top-3 left-3 z-10 rounded border border-[var(--ae-border-strong)] bg-[var(--ae-bg-base)]/85 px-2.5 py-1 font-mono text-xs text-[var(--ae-text-primary)]">
@@ -410,7 +596,7 @@ export function ExplorerCanvas({
                                 : {}),
                             }));
                           }}
-                          className={`h-full w-full object-contain transition-opacity duration-200 ${
+                          className={`h-full w-full object-cover transition-opacity duration-200 ${
                             imgStatus === "loaded" ? "opacity-100" : "opacity-0"
                           }`}
                         />
