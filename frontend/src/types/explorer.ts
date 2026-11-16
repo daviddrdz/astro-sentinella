@@ -8,12 +8,7 @@ export type BlendMode = "Normal" | "Subtract" | "Screen" | "Add";
 export type BandChannelId = 1 | 2 | 3 | 4 | 5 | 6;
 
 export type ChannelTintId =
-  | "grey"
-  | "viridis"
-  | "magma"
-  | "inferno"
-  | "cividis"
-  | "cubehelix";
+  "grey" | "viridis" | "magma" | "inferno" | "cividis" | "cubehelix";
 
 export type TimelineFilterTab = "all" | "visible" | "filtered";
 

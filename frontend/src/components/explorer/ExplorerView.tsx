@@ -21,7 +21,7 @@ import { ExplorerCanvas } from "./ExplorerCanvas";
 import { ExplorerTimeline } from "./ExplorerTimeline";
 import { ExplorerToolbar } from "./ExplorerToolbar";
 import { ExplorerTopBar } from "./ExplorerTopBar";
-import { LayersInspector } from "./LayersInspector";
+// import { LayersInspector } from "./LayersInspector";
 
 interface ExplorerViewProps {
   query: QueryParams;
@@ -186,12 +186,14 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
     setActiveLayerId(next.activeLayerId);
   };
 
+  /*
   const handleToggleLayerVisibility = (id: string) => {
     const next = layers.map((layer) =>
       layer.id === id ? { ...layer, visible: !layer.visible } : layer
     );
     pushSnapshot(next, activeLayerId);
   };
+  */
 
   const handleUpdateLayer = (id: string, patch: Partial<ExplorerLayer>) => {
     const next = layers.map((layer) =>
@@ -200,6 +202,7 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
     pushSnapshot(next, activeLayerId);
   };
 
+  /*
   const handleAddLayer = () => {
     const nextIndex = layers.length + EXPLORER_CONFIG.indexStep;
     const newId = `frm-custom-${nextIndex}`;
@@ -215,6 +218,7 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
     };
     pushSnapshot([newLayer, ...layers], newId);
   };
+  */
 
   const handleMergeVisible = () => {
     const visibleLayers = layers.filter((layer) => layer.visible);
@@ -326,6 +330,7 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
           onCanvasClick={handleCanvasClick}
         />
 
+        {/* Temporarily hidden from layout: Layers & Blend Mode
         <aside
           aria-label="Layers inspector"
           className="hidden w-80 shrink-0 border-l border-[var(--ae-border-subtle)] md:block"
@@ -341,6 +346,7 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
             onMergeVisible={handleMergeVisible}
           />
         </aside>
+        */}
       </div>
 
       <ExplorerTimeline

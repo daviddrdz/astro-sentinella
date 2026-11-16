@@ -111,9 +111,12 @@ export function ExplorerTimeline({
           <select
             aria-label={copy.bandAll}
             value={bandFilter}
-            onChange={(event) =>
-              onChangeBandFilter(event.target.value as BandChannelId | "all")
-            }
+            onChange={(event) => {
+              const value = event.target.value;
+              onChangeBandFilter(
+                value === "all" ? "all" : (Number(value) as BandChannelId)
+              );
+            }}
             className="select select-bordered select-xs ae-field-input bg-[var(--ae-bg-elevated)] text-sm text-[var(--ae-text-primary)]"
           >
             <option value="all">{copy.bandAll}</option>

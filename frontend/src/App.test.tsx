@@ -127,7 +127,11 @@ describe("Astro Sentinella Portal", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Explore" }));
 
-    expect(screen.getByRole("heading", { name: "Layers" })).toBeInTheDocument();
+    // Temporarily hidden from layout: Layers inspector
+    // expect(screen.getByRole("heading", { name: "Layers" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Timeline" })
+    ).toBeInTheDocument();
   });
 
   it("validates fields on submit and focuses the first invalid input", () => {
@@ -177,7 +181,11 @@ describe("Astro Sentinella Portal", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Explore" }));
 
-    expect(screen.getByRole("heading", { name: "Layers" })).toBeInTheDocument();
+    // Temporarily hidden from layout: Layers inspector
+    // expect(screen.getByRole("heading", { name: "Layers" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Timeline" })
+    ).toBeInTheDocument();
     expect(
       screen.getByText(
         `${PORTAL_PLACEHOLDERS.ra} | ${PORTAL_PLACEHOLDERS.dec} | 30 arcmin | ${PORTAL_PLACEHOLDERS.observationDate}`
