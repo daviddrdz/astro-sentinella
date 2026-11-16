@@ -1,11 +1,16 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   DEFAULT_EXPLORER_FRAMES,
   DEFAULT_EXPLORER_LAYERS,
   EXPLORER_CONFIG,
+  EXPLORER_COPY,
 } from "../../config/explorer";
 import { fetchExplorerFrames } from "../../services/framesService";
 import { fetchCoordinateMetadata } from "../../services/metadataService";
+import {
+  fetchChunkSpectrum,
+  SpectrumRequestError,
+} from "../../services/spectrumService";
 import type {
   BandChannelId,
   ExplorerFrame,
@@ -13,6 +18,7 @@ import type {
   ExplorerLocale,
   ExplorerSnapshot,
   ExplorerToolId,
+  SpectrumState,
   TimelineFilterTab,
 } from "../../types/explorer";
 import type { QueryParams } from "../../types/portal";
@@ -21,6 +27,7 @@ import { ExplorerCanvas } from "./ExplorerCanvas";
 import { ExplorerTimeline } from "./ExplorerTimeline";
 import { ExplorerToolbar } from "./ExplorerToolbar";
 import { ExplorerTopBar } from "./ExplorerTopBar";
+import { SpectrumPanel } from "./SpectrumPanel";
 // import { LayersInspector } from "./LayersInspector";
 
 interface ExplorerViewProps {
@@ -63,6 +70,14 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
   const [bandFilter, setBandFilter] = useState<BandChannelId | "all">("all");
   const [isPlaying, setIsPlaying] = useState(false);
   const [docsOpen, setDocsOpen] = useState(false);
+  // Keyed by frame: each date renders a different cutout (orientation, grid),
+  // so a selection never carries over to another frame.
+  const [spectrumEntry, setSpectrumEntry] = useState<{
+    frameId: string | null;
+    state: SpectrumState;
+    grid: { rows: number; cols: number } | null;
+  }>({ frameId: null, state: { status: "idle" }, grid: null });
+  const spectrumAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -296,6 +311,69 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
   const activeFrame =
     frames.find((frame) => frame.id === activeFrameId) ?? null;
 
+  const isCurrentSpectrum = spectrumEntry.frameId === activeFrameId;
+  const spectrum: SpectrumState = isCurrentSpectrum
+    ? spectrumEntry.state
+    : { status: "idle" };
+  const spectrumGrid = isCurrentSpectrum ? spectrumEntry.grid : null;
+
+  useEffect(() => () => spectrumAbortRef.current?.abort(), []);
+
+  const handleChunkSelect = (x: number, y: number) => {
+    const imageUrl = activeFrame?.imageUrl;
+    if (!imageUrl) {
+      return;
+    }
+    spectrumAbortRef.current?.abort();
+    const controller = new AbortController();
+    spectrumAbortRef.current = controller;
+    const frameId = activeFrameId;
+    const grid = spectrumGrid;
+    setSpectrumEntry({
+      frameId,
+      state: { status: "loading", pending: { x, y } },
+      grid,
+    });
+
+    fetchChunkSpectrum(imageUrl, x, y, controller.signal)
+      .then((data) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+        setSpectrumEntry({
+          frameId,
+          state: { status: "loaded", data },
+          grid: { rows: data.chunk.rows, cols: data.chunk.cols },
+        });
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+        const copy = EXPLORER_COPY[locale];
+        const noCoverage =
+          error instanceof SpectrumRequestError &&
+          error.code === "spectrum_unavailable";
+        setSpectrumEntry({
+          frameId,
+          state: {
+            status: "error",
+            message: noCoverage ? copy.spectrumNoCoverage : copy.spectrumError,
+          },
+          grid,
+        });
+      });
+  };
+
+  const handleCloseSpectrum = () => {
+    spectrumAbortRef.current?.abort();
+    setSpectrumEntry((prev) => ({ ...prev, state: { status: "idle" } }));
+    setActiveTool("hand");
+  };
+
+  const showSpectrumPanel =
+    activeTool === "spectrum" || spectrum.status !== "idle";
+
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-[var(--ae-bg-canvas)] text-[var(--ae-text-primary)]">
       <ExplorerTopBar
@@ -313,7 +391,7 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
         }
       />
 
-      <div className="flex min-h-0 flex-1">
+      <div className="relative flex min-h-0 flex-1">
         <ExplorerToolbar
           activeTool={activeTool}
           locale={locale}
@@ -328,7 +406,23 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
           zoomLevel={zoomLevel}
           locale={locale}
           onCanvasClick={handleCanvasClick}
+          spectrumGrid={spectrumGrid}
+          selectedChunk={
+            spectrum.status === "loaded" ? spectrum.data.chunk.bounds : null
+          }
+          pendingChunkClick={
+            spectrum.status === "loading" ? spectrum.pending : null
+          }
+          onChunkSelect={handleChunkSelect}
         />
+
+        {showSpectrumPanel && (
+          <SpectrumPanel
+            state={spectrum}
+            locale={locale}
+            onClose={handleCloseSpectrum}
+          />
+        )}
 
         {/* Temporarily hidden from layout: Layers & Blend Mode
         <aside

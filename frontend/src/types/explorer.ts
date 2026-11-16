@@ -1,7 +1,14 @@
 export type ExplorerLocale = "en" | "es";
 
 export type ExplorerToolId =
-  "hand" | "zoom" | "split" | "subtract" | "region" | "ruler" | "reset";
+  | "hand"
+  | "zoom"
+  | "split"
+  | "subtract"
+  | "region"
+  | "ruler"
+  | "spectrum"
+  | "reset";
 
 export type BlendMode = "Normal" | "Subtract" | "Screen" | "Add";
 
@@ -37,3 +44,40 @@ export interface ExplorerSnapshot {
   activeLayerId: string;
   activeFrameIndex: number;
 }
+
+/** Chunk bounds as fractions of the rendered image (top-left origin). */
+export interface ChunkBounds {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+export interface SpectrumPoint {
+  wavelengthUm: number;
+  bandwidthUm: number;
+  /** null where the mosaic has no coverage for that channel. */
+  flux: number | null;
+}
+
+export interface ChunkSpectrum {
+  chunk: {
+    row: number;
+    col: number;
+    rows: number;
+    cols: number;
+    sizeArcsec: number;
+    bounds: ChunkBounds;
+  };
+  center: { ra: number; dec: number };
+  pixelCount: number;
+  unit: string;
+  source: string;
+  points: SpectrumPoint[];
+}
+
+export type SpectrumState =
+  | { status: "idle" }
+  | { status: "loading"; pending: { x: number; y: number } }
+  | { status: "loaded"; data: ChunkSpectrum }
+  | { status: "error"; message: string };

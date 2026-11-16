@@ -6,6 +6,25 @@ This document defines conventions for implementing the Flask API consumed by the
 
 - `GET /api/metadata?ra={ra}&dec={dec}` returns coordinate metadata used to populate available observation dates.
 - `GET /api/frames?ra={ra}&dec={dec}&fieldSizeDeg={degrees}&observationDate={date}` returns the frames for an explorer query.
+- `GET /api/frames/spectrum?ra={ra}&dec={dec}&fieldSizeDeg={degrees}&observationDate={date}&x={0..1}&y={0..1}` returns the quick-look spectrum (flux vs wavelength, 102 SPHEREx channels) of the chunk under a click on the rendered frame image.
+
+### Chunk spectrum
+
+`x` and `y` are the click position as fractions of the rendered image (`x` left to right, `y` top to bottom). The backend owns the chunk grid: cells are about `SPECTRUM_CHUNK_ARCSEC` (default 26″, ~2 HiPS cube pixels) on a side, so the client never hard-codes the grid size. Chunk corners go through the frame's WCS to the sky and into the SPHEREx DR1 HiPS cube, where the cube pixels inside the chunk are averaged per channel. The cube is an all-mission mosaic: the spectrum is of the sky region, not of the selected observation date, and it is for visualization only.
+
+```json
+{
+  "chunk": { "row": 0, "col": 3, "rows": 7, "cols": 7, "sizeArcsec": 25.48,
+             "bounds": { "left": 0.4286, "top": 0.0, "width": 0.1429, "height": 0.1429 } },
+  "center": { "ra": 133.79, "dec": -7.24 },
+  "pixelCount": 4,
+  "unit": "MJy/sr",
+  "source": "SPHEREx DR1 HiPS cube (all-mission mosaic, quick-look)",
+  "points": [ { "wavelengthUm": 0.7536, "bandwidthUm": 0.0189, "flux": 0.42 }, "... 102 items, sorted by wavelength; flux is null for channels without coverage" ]
+}
+```
+
+Errors: `400 invalid_request`, `404 image_not_found` (no frame on that date), `404 spectrum_unavailable` (no cube coverage for the chunk), `502 spectrum_source_unavailable`. The route has its own rate limit, `SPECTRUM_RATE_LIMIT` (default `30 per minute`).
 
 Keep these contracts aligned with the frontend types and service validation in `frontend/src/types/portal.ts`, `frontend/src/types/explorer.ts`, `frontend/src/services/metadataService.ts`, and `frontend/src/services/framesService.ts`.
 

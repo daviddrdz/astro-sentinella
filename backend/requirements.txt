@@ -4,4 +4,6 @@ pyvo>=1.5,<2.0
 astropy>=6.0,<8.0
 numpy>=1.26,<3.0
 matplotlib>=3.8,<4.0
+hpgeom>=1.2,<2.0
+requests>=2.31,<3.0
 pytest>=8.0,<9.0
