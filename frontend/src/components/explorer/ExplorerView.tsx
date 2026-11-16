@@ -7,6 +7,12 @@ import {
   EXPLORER_COPY,
   type BandChannelOption,
 } from "../../config/explorer";
+import {
+  SKY3D_CONSTANTS,
+  type Sky3DScaleId,
+  type Sky3DTarget,
+  type SkyObjectDetails,
+} from "../../config/sky3dCatalog";
 import { requestFrameComparison } from "../../services/compareService";
 import { fetchExplorerFrames } from "../../services/framesService";
 import { fetchCoordinateMetadata } from "../../services/metadataService";
@@ -29,11 +35,12 @@ import type {
 import type { QueryParams } from "../../types/portal";
 import { DocsModal } from "../DocsModal";
 import { CompareInspector } from "./CompareInspector";
-import { Explorer3DCanvas } from "./Explorer3DCanvas";
+import { Explorer3DCanvas, type Center3DRequest } from "./Explorer3DCanvas";
 import { ExplorerCanvas } from "./ExplorerCanvas";
 import { ExplorerTimeline } from "./ExplorerTimeline";
 import { ExplorerToolbar } from "./ExplorerToolbar";
 import { ExplorerTopBar } from "./ExplorerTopBar";
+import { SkyObjectInspector } from "./SkyObjectInspector";
 import { SpectrumPanel } from "./SpectrumPanel";
 import { LayersInspector } from "./LayersInspector";
 
@@ -98,6 +105,14 @@ function restrictLayers(
 export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
   const [locale, setLocale] = useState<ExplorerLocale>("en");
   const [viewMode, setViewMode] = useState<ExplorerViewMode>("2d");
+  const [queryOverride, setQueryOverride] = useState<QueryParams | null>(null);
+  const activeQuery = queryOverride ?? query;
+  const [scale3D, setScale3D] = useState<Sky3DScaleId>("sky-view");
+  const [selectedSkyObject, setSelectedSkyObject] =
+    useState<SkyObjectDetails | null>(null);
+  const [centerRequest, setCenterRequest] = useState<Center3DRequest | null>(
+    null
+  );
   const [layers, setLayers] = useState<ExplorerLayer[]>(() =>
     cloneLayers([...DEFAULT_EXPLORER_LAYERS])
   );
@@ -147,8 +162,12 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
   useEffect(() => {
     const controller = new AbortController();
     Promise.all([
-      fetchCoordinateMetadata(query.ra, query.dec, controller.signal),
-      fetchExplorerFrames(query, controller.signal),
+      fetchCoordinateMetadata(
+        activeQuery.ra,
+        activeQuery.dec,
+        controller.signal
+      ),
+      fetchExplorerFrames(activeQuery, controller.signal),
     ]).then(([metadata, remoteFrames]) => {
       if (controller.signal.aborted) {
         return;
@@ -172,9 +191,9 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
         const dateFrames: ExplorerFrame[] = metadata.availableDates.map(
           (obsDate) => {
             const imgParams = new URLSearchParams({
-              ra: query.ra.trim(),
-              dec: query.dec.trim(),
-              fieldSizeDeg: query.fieldSizeDeg.trim(),
+              ra: activeQuery.ra.trim(),
+              dec: activeQuery.dec.trim(),
+              fieldSizeDeg: activeQuery.fieldSizeDeg.trim(),
               observationDate: obsDate,
             });
             return {
@@ -189,7 +208,7 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
         );
         setFrames(dateFrames);
         const matchingFrame = dateFrames.find(
-          (frame) => frame.timestamp === query.observationDate.trim()
+          (frame) => frame.timestamp === activeQuery.observationDate.trim()
         );
         setActiveFrameId(
           matchingFrame?.id ??
@@ -205,7 +224,7 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
       }
     });
     return () => controller.abort();
-  }, [query]);
+  }, [activeQuery]);
 
   const activeFrameIndex = Math.max(
     EXPLORER_CONFIG.firstIndex,
@@ -506,7 +525,7 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
     setIsCompareSelecting(false);
     setCompareFrameIds([]);
 
-    const result = await requestFrameComparison(query, frameA, frameB);
+    const result = await requestFrameComparison(activeQuery, frameA, frameB);
     setRestas((prev) =>
       prev.map((item) =>
         item.id === restaId
@@ -527,10 +546,52 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
     );
   };
 
+  const handleCenterSkyObject = (obj: SkyObjectDetails) => {
+    setViewMode("3d");
+    setScale3D("sky-view");
+    setCenterRequest((prev) => ({
+      raDeg: obj.raDeg,
+      decDeg: obj.decDeg,
+      fovDeg: SKY3D_CONSTANTS.telescopeFovDeg,
+      nonce: (prev?.nonce ?? 0) + 1,
+    }));
+  };
+
+  const handleSyncObjectToQuery = (obj: SkyObjectDetails) => {
+    setQueryOverride({
+      ...activeQuery,
+      ra: obj.raDisplay,
+      dec: obj.decDisplay,
+    });
+    setCenterRequest((prev) => ({
+      raDeg: obj.raDeg,
+      decDeg: obj.decDeg,
+      fovDeg: SKY3D_CONSTANTS.telescopeFovDeg,
+      nonce: (prev?.nonce ?? 0) + 1,
+    }));
+  };
+
+  const handleSelectFeaturedTarget = (target: Sky3DTarget) => {
+    const details: SkyObjectDetails = {
+      kind: "target",
+      id: target.id,
+      name: target.name,
+      subtitle: target.category,
+      raDeg: target.raDeg,
+      decDeg: target.decDeg,
+      raDisplay: target.raDisplay,
+      decDisplay: target.decDisplay,
+      distPc: target.distPc,
+      colorCss: "#22d3ee",
+    };
+    setSelectedSkyObject(details);
+    handleCenterSkyObject(details);
+  };
+
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-[var(--ae-bg-canvas)] text-[var(--ae-text-primary)]">
       <ExplorerTopBar
-        query={query}
+        query={activeQuery}
         locale={locale}
         viewMode={viewMode}
         onChangeViewMode={setViewMode}
@@ -555,14 +616,18 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
 
         {viewMode === "3d" ? (
           <Explorer3DCanvas
-            query={query}
+            query={activeQuery}
             activeFrame={activeFrame}
             activeSubtraction={activeSubtraction}
             locale={locale}
+            scale={scale3D}
+            onChangeScale={setScale3D}
+            onSelectObject={setSelectedSkyObject}
+            centerRequest={centerRequest}
           />
         ) : (
           <ExplorerCanvas
-            query={query}
+            query={activeQuery}
             layers={layers}
             activeFrame={activeFrame}
             activeSubtraction={activeSubtraction}
@@ -596,6 +661,15 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
           aria-label="Compare inspector"
           className="hidden w-80 shrink-0 overflow-y-auto border-l border-[var(--ae-border-subtle)] bg-[var(--ae-bg-base)] md:flex md:flex-col"
         >
+          <SkyObjectInspector
+            query={activeQuery}
+            locale={locale}
+            selectedObject={selectedSkyObject}
+            onClearSelection={() => setSelectedSkyObject(null)}
+            onSelectTarget={handleSelectFeaturedTarget}
+            onCenterObject={handleCenterSkyObject}
+            onSyncToQuery={handleSyncObjectToQuery}
+          />
           <LayersInspector
             layers={layers}
             availableChannels={availableChannels}

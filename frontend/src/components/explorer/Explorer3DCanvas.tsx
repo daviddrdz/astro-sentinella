@@ -13,6 +13,8 @@ import {
   bvToSpectralClass,
   equatorialToCartesian,
   equatorialToGalacticDeg,
+  formatDecSexagesimal,
+  formatRaSexagesimal,
   loadHygStars,
   PLANETS_J2000,
   planetPositionAu,
@@ -25,6 +27,7 @@ import {
   type HygStarDataset,
   type Sky3DScaleId,
   type Sky3DTarget,
+  type SkyObjectDetails,
 } from "../../config/sky3dCatalog";
 import type {
   ExplorerFrame,
@@ -33,11 +36,22 @@ import type {
 } from "../../types/explorer";
 import type { QueryParams } from "../../types/portal";
 
+export interface Center3DRequest {
+  raDeg: number;
+  decDeg: number;
+  fovDeg?: number;
+  nonce: number;
+}
+
 interface Explorer3DCanvasProps {
   query: QueryParams;
   activeFrame: ExplorerFrame | null;
   activeSubtraction?: SubtractionResult | null;
   locale: ExplorerLocale;
+  scale?: Sky3DScaleId;
+  onChangeScale?: (nextScale: Sky3DScaleId) => void;
+  onSelectObject?: (obj: SkyObjectDetails) => void;
+  centerRequest?: Center3DRequest | null;
 }
 
 interface ProjectedLabel {
@@ -607,19 +621,30 @@ export function Explorer3DCanvas({
   activeFrame,
   activeSubtraction,
   locale,
+  scale: controlledScale,
+  onChangeScale,
+  onSelectObject,
+  centerRequest,
 }: Explorer3DCanvasProps) {
   const copy = SKY_3D_COPY[locale];
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  const [scale, setScale] = useState<Sky3DScaleId>("sky-view");
+  const [internalScale, setInternalScale] = useState<Sky3DScaleId>("sky-view");
+  const scale = controlledScale ?? internalScale;
+  const setScale = useCallback(
+    (next: Sky3DScaleId) => {
+      if (onChangeScale) {
+        onChangeScale(next);
+      } else {
+        setInternalScale(next);
+      }
+    },
+    [onChangeScale]
+  );
   const [hygData, setHygData] = useState<HygStarDataset | null>(null);
   const [loadingStars, setLoadingStars] = useState(true);
   const [webglUnavailable, setWebglUnavailable] = useState(false);
-  const [selectedTarget, setSelectedTarget] = useState<Sky3DTarget | null>(
-    null
-  );
   const [hoveredStar, setHoveredStar] = useState<StarInspection | null>(null);
-  const [selectedStar, setSelectedStar] = useState<StarInspection | null>(null);
   const [hudFov, setHudFov] = useState<number>(SKY3D_CONSTANTS.defaultFovDeg);
   const [projectedLabels, setProjectedLabels] = useState<ProjectedLabel[]>([]);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -689,6 +714,24 @@ export function Explorer3DCanvas({
       )
     );
   }, [targetRaDeg, targetDecDeg]);
+
+  useEffect(() => {
+    if (!centerRequest) return;
+    camStateRef.current.targetYaw =
+      centerRequest.raDeg * SKY3D_CONSTANTS.degToRad + SKY3D_CONSTANTS.halfPi;
+    camStateRef.current.targetPitch = Math.max(
+      SKY3D_CONSTANTS.minPitchRad,
+      Math.min(
+        SKY3D_CONSTANTS.maxPitchRad,
+        centerRequest.decDeg * SKY3D_CONSTANTS.degToRad
+      )
+    );
+    if (typeof centerRequest.fovDeg === "number") {
+      const nextFov = centerRequest.fovDeg;
+      camStateRef.current.targetFov = nextFov;
+      requestAnimationFrame(() => setHudFov(Math.round(nextFov)));
+    }
+  }, [centerRequest]);
 
   const handleSelectScale = (nextScale: Sky3DScaleId) => {
     setScale(nextScale);
@@ -1182,9 +1225,21 @@ export function Explorer3DCanvas({
     }
     if (wasClick) {
       const hit = findNearestStarAtScreenPos(e.clientX, e.clientY);
-      if (hit) {
-        setSelectedTarget(null);
-        setSelectedStar(hit);
+      if (hit && onSelectObject) {
+        onSelectObject({
+          kind: "star",
+          id: `star-${hit.raDeg.toFixed(R.three)}-${hit.decDeg.toFixed(R.three)}`,
+          name: hit.name ?? copy.unnamedStar,
+          subtitle: hit.spectralClass,
+          raDeg: hit.raDeg,
+          decDeg: hit.decDeg,
+          raDisplay: formatRaSexagesimal(hit.raDeg),
+          decDisplay: formatDecSexagesimal(hit.decDeg),
+          distPc: hit.distPc,
+          mag: hit.mag,
+          ci: hit.ci,
+          colorCss: hit.colorCss,
+        });
       }
     }
   };
@@ -1225,8 +1280,20 @@ export function Explorer3DCanvas({
   };
 
   const handleSelectTarget = (target: Sky3DTarget) => {
-    setSelectedStar(null);
-    setSelectedTarget(target);
+    if (onSelectObject) {
+      onSelectObject({
+        kind: "target",
+        id: target.id,
+        name: target.name,
+        subtitle: target.category,
+        raDeg: target.raDeg,
+        decDeg: target.decDeg,
+        raDisplay: target.raDisplay,
+        decDisplay: target.decDisplay,
+        distPc: target.distPc,
+        colorCss: "#22d3ee",
+      });
+    }
     if (scale !== "sky-view") {
       setScale("sky-view");
     }
@@ -1304,6 +1371,7 @@ export function Explorer3DCanvas({
             <button
               key={item.id}
               type="button"
+              onPointerDown={(ev) => ev.stopPropagation()}
               onClick={(ev) => {
                 ev.stopPropagation();
                 if (item.target) handleSelectTarget(item.target);
@@ -1354,7 +1422,10 @@ export function Explorer3DCanvas({
         </div>
       </div>
 
-      <div className="absolute top-4 right-4 flex items-center gap-1.5">
+      <div
+        className="absolute top-4 right-4 flex items-center gap-1.5"
+        onPointerDown={(e) => e.stopPropagation()}
+      >
         <button
           type="button"
           onClick={() =>
@@ -1427,101 +1498,10 @@ export function Explorer3DCanvas({
         </div>
       )}
 
-      {selectedStar && (
-        <div
-          data-testid="selected-star-card"
-          className="absolute right-4 bottom-20 z-20 w-68 rounded-xl border border-cyan-400/35 bg-slate-950/90 p-3 text-xs text-slate-200 shadow-xl backdrop-blur-md"
-        >
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <span
-                className="h-3 w-3 shrink-0 rounded-full ring-2 ring-white/20"
-                style={{ backgroundColor: selectedStar.colorCss }}
-              />
-              <div>
-                <div className="font-semibold text-cyan-200">
-                  {selectedStar.name ?? copy.unnamedStar}
-                </div>
-                <div className="text-[11px] text-slate-400">
-                  {copy.spectralLabel}: {selectedStar.spectralClass}
-                </div>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setSelectedStar(null)}
-              className="text-slate-400 hover:text-white"
-              aria-label="Close star card"
-            >
-              ×
-            </button>
-          </div>
-          <div className="mt-2 space-y-0.5 font-mono text-[10px] text-slate-300">
-            <div>
-              {copy.magnitudeLabel}: {selectedStar.mag.toFixed(R.two)}
-            </div>
-            <div>
-              {copy.distanceLabel}:{" "}
-              {Math.round(selectedStar.distPc * SKY3D_CONSTANTS.pcToLy)} ly (
-              {selectedStar.distPc.toFixed(1)} pc)
-            </div>
-            <div>
-              {copy.raLabel}: {selectedStar.raDeg.toFixed(R.three)}° ·{" "}
-              {copy.decLabel}: {selectedStar.decDeg.toFixed(R.three)}°
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() =>
-              aimCameraAtSkyCoords(
-                selectedStar.raDeg,
-                selectedStar.decDeg,
-                SKY3D_CONSTANTS.telescopeFovDeg
-              )
-            }
-            className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-cyan-400/35 bg-cyan-500/15 px-2.5 py-1 text-[11px] font-medium text-cyan-200 transition hover:bg-cyan-500/25"
-          >
-            <Crosshair className="h-3 w-3" />
-            <span>{copy.centerOnStar}</span>
-          </button>
-        </div>
-      )}
-
-      {selectedTarget && (
-        <div className="absolute right-4 bottom-20 w-64 rounded-xl border border-cyan-400/30 bg-slate-950/85 p-3 text-xs text-slate-200 shadow-xl backdrop-blur-md">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <div className="font-semibold text-cyan-200">
-                {selectedTarget.name}
-              </div>
-              <div className="text-[11px] text-slate-400">
-                {selectedTarget.category}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setSelectedTarget(null)}
-              className="text-slate-400 hover:text-white"
-              aria-label="Close target card"
-            >
-              ×
-            </button>
-          </div>
-          <div className="mt-2 space-y-0.5 font-mono text-[10px] text-slate-300">
-            <div>
-              {copy.raLabel}: {selectedTarget.raDisplay}
-            </div>
-            <div>
-              {copy.decLabel}: {selectedTarget.decDisplay}
-            </div>
-            <div>
-              ~{Math.round(selectedTarget.distPc * SKY3D_CONSTANTS.pcToLy)} ly
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 flex-col items-center gap-1.5">
+      <div
+        className="absolute bottom-4 left-1/2 flex -translate-x-1/2 flex-col items-center gap-1.5"
+        onPointerDown={(e) => e.stopPropagation()}
+      >
         <div
           className="flex items-center gap-1 rounded-full border border-white/15 bg-slate-950/85 p-1 shadow-xl backdrop-blur-md"
           role="tablist"

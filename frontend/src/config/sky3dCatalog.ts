@@ -24,6 +24,21 @@ export interface Sky3DTarget {
   decDisplay: string;
 }
 
+export interface SkyObjectDetails {
+  kind: "star" | "target";
+  id: string;
+  name: string;
+  subtitle: string;
+  raDeg: number;
+  decDeg: number;
+  raDisplay: string;
+  decDisplay: string;
+  distPc: number;
+  mag?: number;
+  ci?: number;
+  colorCss: string;
+}
+
 export interface PlanetDefinition {
   id: string;
   nameEn: string;
@@ -439,6 +454,26 @@ export function bvToSpectralClass(bv: number): string {
   return "M (Red)";
 }
 
+export function formatRaSexagesimal(raDeg: number): string {
+  const norm = ((raDeg % 360) + 360) % 360;
+  const totalHours = norm / SKY3D_CONSTANTS.hoursToDeg;
+  const h = Math.floor(totalHours);
+  const remM = (totalHours - h) * 60;
+  const m = Math.floor(remM);
+  const s = (remM - m) * 60;
+  return `${String(h).padStart(2, "0")}h ${String(m).padStart(2, "0")}m ${s.toFixed(1).padStart(4, "0")}s`;
+}
+
+export function formatDecSexagesimal(decDeg: number): string {
+  const sign = decDeg < 0 ? "-" : "+";
+  const abs = Math.abs(decDeg);
+  const d = Math.floor(abs);
+  const remM = (abs - d) * 60;
+  const m = Math.floor(remM);
+  const s = (remM - m) * 60;
+  return `${sign}${String(d).padStart(2, "0")}° ${String(m).padStart(2, "0")}' ${s.toFixed(0).padStart(2, "0")}"`;
+}
+
 /**
  * Compute Galactic coordinates (l, b) in degrees from equatorial J2000 (raDeg, decDeg)
  * to render the real Milky Way band across the celestial sphere.
@@ -577,6 +612,12 @@ export const SKY_3D_COPY: Record<
     spectralLabel: string;
     centerOnStar: string;
     starClickHint: string;
+    inspectorTitle: string;
+    inspectorEmptyHint: string;
+    syncTo2D3D: string;
+    syncedLabel: string;
+    featuredTargetsTitle: string;
+    activeRegionTitle: string;
   }
 > = {
   en: {
@@ -615,8 +656,15 @@ export const SKY_3D_COPY: Record<
     magnitudeLabel: "Mag",
     distanceLabel: "Distance",
     spectralLabel: "Class",
-    centerOnStar: "Center",
+    centerOnStar: "Center & Zoom",
     starClickHint: "Hover or click any star",
+    inspectorTitle: "3D Celestial Inspector",
+    inspectorEmptyHint:
+      "Click any star or SPHEREx target in 3D to inspect its astronomical data and sync with 2D.",
+    syncTo2D3D: "Load in 2D & 3D",
+    syncedLabel: "Active region",
+    featuredTargetsTitle: "SPHEREx Targets",
+    activeRegionTitle: "Shared Coordinates",
   },
   es: {
     scales: {
@@ -654,7 +702,14 @@ export const SKY_3D_COPY: Record<
     magnitudeLabel: "Mag",
     distanceLabel: "Distancia",
     spectralLabel: "Clase",
-    centerOnStar: "Centrar",
+    centerOnStar: "Centrar y acercar",
     starClickHint: "Pasa o haz clic en una estrella",
+    inspectorTitle: "Inspector Celeste 3D",
+    inspectorEmptyHint:
+      "Haz clic en cualquier estrella u objetivo SPHEREx en 3D para ver su detalle y sincronizar con 2D.",
+    syncTo2D3D: "Cargar en 2D y 3D",
+    syncedLabel: "Región activa",
+    featuredTargetsTitle: "Objetivos SPHEREx",
+    activeRegionTitle: "Coordenadas compartidas",
   },
 };
