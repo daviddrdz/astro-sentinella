@@ -17,6 +17,12 @@ const PLOT_RIGHT = C.width - C.margin.right;
 
 type FinitePoint = SpectrumPoint & { flux: number };
 
+// Typography straight from styles/tokens.css (SSOT). The SVG renders 1:1, so
+// these resolve to the same sizes as the rest of the page.
+const TEXT_SM = "text-[length:var(--ae-text-sm)]";
+const FONT_MONO = "font-[family-name:var(--ae-font-mono)]";
+const FONT_SANS = "font-[family-name:var(--ae-font-sans)]";
+
 export function SpectrumChart({
   points,
   unit,
@@ -125,150 +131,151 @@ export function SpectrumChart({
     : 0;
 
   return (
-    <div className="relative">
-      <svg
-        viewBox={`0 0 ${C.width} ${C.height}`}
-        role="img"
-        aria-label={`${fluxLabel} (${unit}) vs ${wavelengthLabel}`}
-        tabIndex={0}
-        className="block w-full touch-none outline-none focus-visible:ring-2 focus-visible:ring-[var(--ae-accent-primary)]"
-        onPointerMove={handlePointerMove}
-        onPointerLeave={() => setHoverIndex(null)}
-        onKeyDown={handleKeyDown}
-        onBlur={() => setHoverIndex(null)}
-      >
-        {/* Recessive grid + y labels */}
-        {scales.yTicks.map((tick) => (
-          <g key={`y-${tick}`}>
-            <line
-              x1={C.margin.left}
-              x2={PLOT_RIGHT}
-              y1={scales.y(tick)}
-              y2={scales.y(tick)}
-              stroke="var(--ae-border-subtle)"
-            />
-            <text
-              x={C.margin.left - C.yLabelGap}
-              y={scales.y(tick)}
-              dy="0.32em"
-              textAnchor="end"
-              className="fill-[var(--ae-text-muted)] font-mono text-[10px]"
-            >
-              {formatTick(tick, scales.yStep)}
-            </text>
-          </g>
-        ))}
-
-        {/* Reference features */}
-        {C.referenceLines
-          .filter((ref) => ref.um > scales.xMin && ref.um < scales.xMax)
-          .map((ref) => (
-            <g key={ref.label}>
+    <figure className="mx-auto w-full" style={{ maxWidth: C.width }}>
+      <figcaption className={`mb-1 ${TEXT_SM} text-[var(--ae-text-secondary)]`}>
+        {fluxLabel}{" "}
+        <span className={`${FONT_MONO} text-[var(--ae-text-muted)]`}>
+          ({unit})
+        </span>
+      </figcaption>
+      <div className="relative">
+        <svg
+          viewBox={`0 0 ${C.width} ${C.height}`}
+          role="img"
+          aria-label={`${fluxLabel} (${unit}) vs ${wavelengthLabel}`}
+          tabIndex={0}
+          className="block w-full touch-none rounded-[var(--ae-radius-sm)] outline-none focus-visible:outline-[length:var(--ae-focus-ring-width)] focus-visible:outline-offset-[length:var(--ae-focus-ring-offset)] focus-visible:outline-[var(--ae-accent-primary)] focus-visible:outline-solid"
+          onPointerMove={handlePointerMove}
+          onPointerLeave={() => setHoverIndex(null)}
+          onKeyDown={handleKeyDown}
+          onBlur={() => setHoverIndex(null)}
+        >
+          {/* Recessive grid + y labels */}
+          {scales.yTicks.map((tick) => (
+            <g key={`y-${tick}`}>
               <line
-                x1={scales.x(ref.um)}
-                x2={scales.x(ref.um)}
-                y1={C.margin.top}
-                y2={PLOT_BOTTOM}
-                stroke="var(--ae-text-muted)"
-                strokeOpacity={C.refLineOpacity}
-                strokeDasharray="2 3"
+                x1={C.margin.left}
+                x2={PLOT_RIGHT}
+                y1={scales.y(tick)}
+                y2={scales.y(tick)}
+                stroke="var(--ae-border-subtle)"
               />
               <text
-                x={scales.x(ref.um)}
-                y={C.margin.top - C.refLabelGap}
-                textAnchor="middle"
-                className="fill-[var(--ae-text-muted)] text-[9px]"
+                x={C.margin.left - C.yLabelGap}
+                y={scales.y(tick)}
+                dy="0.32em"
+                textAnchor="end"
+                className={`fill-[var(--ae-text-muted)] ${FONT_MONO} ${TEXT_SM}`}
               >
-                {ref.label}
+                {formatTick(tick, scales.yStep)}
               </text>
             </g>
           ))}
 
-        {/* X axis */}
-        <line
-          x1={C.margin.left}
-          x2={PLOT_RIGHT}
-          y1={PLOT_BOTTOM}
-          y2={PLOT_BOTTOM}
-          stroke="var(--ae-border-strong)"
-        />
-        {C.xTicksUm.map((tick) => (
+          {/* Reference features */}
+          {C.referenceLines
+            .filter((ref) => ref.um > scales.xMin && ref.um < scales.xMax)
+            .map((ref) => (
+              <g key={ref.label}>
+                <line
+                  x1={scales.x(ref.um)}
+                  x2={scales.x(ref.um)}
+                  y1={C.margin.top}
+                  y2={PLOT_BOTTOM}
+                  stroke="var(--ae-text-muted)"
+                  strokeOpacity={C.refLineOpacity}
+                  strokeDasharray={C.refDash}
+                />
+                <text
+                  x={scales.x(ref.um)}
+                  y={C.margin.top - C.refLabelGap}
+                  textAnchor="middle"
+                  className={`fill-[var(--ae-text-muted)] ${FONT_SANS} ${TEXT_SM}`}
+                >
+                  {ref.label}
+                </text>
+              </g>
+            ))}
+
+          {/* X axis */}
+          <line
+            x1={C.margin.left}
+            x2={PLOT_RIGHT}
+            y1={PLOT_BOTTOM}
+            y2={PLOT_BOTTOM}
+            stroke="var(--ae-border-strong)"
+          />
+          {C.xTicksUm.map((tick) => (
+            <text
+              key={`x-${tick}`}
+              x={scales.x(tick)}
+              y={PLOT_BOTTOM + C.xLabelOffset}
+              textAnchor="middle"
+              className={`fill-[var(--ae-text-muted)] ${FONT_MONO} ${TEXT_SM}`}
+            >
+              {tick}
+            </text>
+          ))}
           <text
-            key={`x-${tick}`}
-            x={scales.x(tick)}
-            y={PLOT_BOTTOM + C.xLabelOffset}
+            x={C.margin.left + PLOT_W / C.half}
+            y={C.height - C.axisTitleInset}
             textAnchor="middle"
-            className="fill-[var(--ae-text-muted)] font-mono text-[10px]"
+            className={`fill-[var(--ae-text-secondary)] ${FONT_SANS} ${TEXT_SM}`}
           >
-            {tick}
+            {wavelengthLabel}
           </text>
-        ))}
-        <text
-          x={C.margin.left + PLOT_W / C.half}
-          y={C.height - C.axisTitleInset}
-          textAnchor="middle"
-          className="fill-[var(--ae-text-secondary)] text-[10px]"
-        >
-          {wavelengthLabel}
-        </text>
-        <text
-          transform={`translate(${C.yTitleX} ${C.margin.top + PLOT_H / C.half}) rotate(-90)`}
-          textAnchor="middle"
-          className="fill-[var(--ae-text-secondary)] text-[10px]"
-        >
-          {`${fluxLabel} (${unit})`}
-        </text>
 
-        {/* The spectrum */}
-        <path
-          data-testid="spectrum-line"
-          d={path}
-          fill="none"
-          stroke="var(--ae-accent-primary)"
-          strokeWidth={C.lineWidth}
-          strokeLinejoin="round"
-          strokeLinecap="round"
-        />
+          {/* The spectrum */}
+          <path
+            data-testid="spectrum-line"
+            d={path}
+            fill="none"
+            stroke="var(--ae-accent-primary)"
+            strokeWidth={C.lineWidth}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
 
-        {/* Hover crosshair + marker with a surface ring */}
+          {/* Hover crosshair + marker with a surface ring */}
+          {hovered && (
+            <g pointerEvents="none">
+              <line
+                x1={scales.x(hovered.wavelengthUm)}
+                x2={scales.x(hovered.wavelengthUm)}
+                y1={C.margin.top}
+                y2={PLOT_BOTTOM}
+                stroke="var(--ae-text-muted)"
+                strokeOpacity={C.crosshairOpacity}
+              />
+              <circle
+                cx={scales.x(hovered.wavelengthUm)}
+                cy={scales.y(hovered.flux)}
+                r={C.markerRadius}
+                fill="var(--ae-accent-primary)"
+                stroke="var(--ae-bg-surface)"
+                strokeWidth={C.markerRing}
+              />
+            </g>
+          )}
+        </svg>
+
         {hovered && (
-          <g pointerEvents="none">
-            <line
-              x1={scales.x(hovered.wavelengthUm)}
-              x2={scales.x(hovered.wavelengthUm)}
-              y1={C.margin.top}
-              y2={PLOT_BOTTOM}
-              stroke="var(--ae-text-muted)"
-              strokeOpacity={C.crosshairOpacity}
-            />
-            <circle
-              cx={scales.x(hovered.wavelengthUm)}
-              cy={scales.y(hovered.flux)}
-              r={C.markerRadius}
-              fill="var(--ae-accent-primary)"
-              stroke="var(--ae-bg-surface)"
-              strokeWidth={C.markerRing}
-            />
-          </g>
+          <div
+            role="status"
+            className={`pointer-events-none absolute top-1 z-10 -translate-x-1/2 rounded-[var(--ae-radius-sm)] border border-[var(--ae-border-strong)] bg-[var(--ae-bg-elevated)] px-2 py-1 ${FONT_MONO} ${TEXT_SM} whitespace-nowrap text-[var(--ae-text-primary)] shadow-lg`}
+            style={{ left: `${tooltipLeftPct}%` }}
+          >
+            <div>
+              {`λ ${hovered.wavelengthUm.toFixed(C.wavelengthDecimals)} µm ± ${(
+                hovered.bandwidthUm / C.half
+              ).toFixed(C.wavelengthDecimals)}`}
+            </div>
+            <div className="text-[var(--ae-text-secondary)]">
+              {`${formatFlux(hovered.flux)} ${unit}`}
+            </div>
+          </div>
         )}
-      </svg>
-
-      {hovered && (
-        <div
-          role="status"
-          className="pointer-events-none absolute top-1 z-10 -translate-x-1/2 rounded border border-[var(--ae-border-strong)] bg-[var(--ae-bg-elevated)] px-2 py-1 font-mono text-[11px] whitespace-nowrap text-[var(--ae-text-primary)] shadow-lg"
-          style={{ left: `${tooltipLeftPct}%` }}
-        >
-          <div>
-            {`λ ${hovered.wavelengthUm.toFixed(C.wavelengthDecimals)} µm ± ${(
-              hovered.bandwidthUm / C.half
-            ).toFixed(C.wavelengthDecimals)}`}
-          </div>
-          <div className="text-[var(--ae-text-secondary)]">
-            {`${formatFlux(hovered.flux)} ${unit}`}
-          </div>
-        </div>
-      )}
-    </div>
+      </div>
+    </figure>
   );
 }
