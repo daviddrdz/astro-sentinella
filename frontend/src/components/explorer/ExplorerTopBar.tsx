@@ -2,7 +2,9 @@ import { SiGithub } from "@icons-pack/react-simple-icons";
 import {
   ArrowLeft,
   BookOpen,
+  ChevronDown,
   // GitMerge,
+  Globe,
   Menu,
   Redo2,
   Telescope,
@@ -171,32 +173,53 @@ export function ExplorerTopBar({
           <span>{copy.github}</span>
         </a>
 
-        <button
-          type="button"
-          onClick={onToggleLocale}
-          aria-label="Toggle language"
-          className="btn btn-ghost btn-sm font-mono text-sm text-[var(--ae-text-muted)] hover:text-[var(--ae-text-primary)]"
-        >
-          <span
-            className={
-              locale === "en"
-                ? "font-semibold text-[var(--ae-text-primary)]"
-                : ""
-            }
+        <div className="dropdown dropdown-end">
+          <button
+            type="button"
+            tabIndex={EXPLORER_CONFIG.firstIndex}
+            aria-label="Toggle language"
+            className="btn btn-ghost btn-sm gap-1 font-mono text-[length:var(--ae-text-sm)] text-[var(--ae-text-secondary)] hover:text-[var(--ae-text-primary)]"
           >
-            EN
-          </span>
-          <span className="mx-0.5 text-[var(--ae-border-strong)]">|</span>
-          <span
-            className={
-              locale === "es"
-                ? "font-semibold text-[var(--ae-text-primary)]"
-                : ""
-            }
+            <Globe size={EXPLORER_CONFIG.iconSizeSm} aria-hidden="true" />
+            <span>{locale.toUpperCase()}</span>
+            <ChevronDown size={EXPLORER_CONFIG.iconSizeSm} aria-hidden="true" />
+          </button>
+          <ul
+            tabIndex={EXPLORER_CONFIG.firstIndex}
+            className="menu dropdown-content z-30 mt-2 w-36 rounded-[var(--ae-radius-md)] border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-elevated)] p-1 shadow-xl"
           >
-            ES
-          </span>
-        </button>
+            <li>
+              <button
+                type="button"
+                className={
+                  locale === "en"
+                    ? "font-semibold text-[var(--ae-accent-primary)]"
+                    : "text-[var(--ae-text-secondary)]"
+                }
+                onClick={() => {
+                  if (locale !== "en") onToggleLocale();
+                }}
+              >
+                English (EN)
+              </button>
+            </li>
+            <li>
+              <button
+                type="button"
+                className={
+                  locale === "es"
+                    ? "font-semibold text-[var(--ae-accent-primary)]"
+                    : "text-[var(--ae-text-secondary)]"
+                }
+                onClick={() => {
+                  if (locale !== "es") onToggleLocale();
+                }}
+              >
+                Español (ES)
+              </button>
+            </li>
+          </ul>
+        </div>
       </div>
 
       {/* Mobile actions */}

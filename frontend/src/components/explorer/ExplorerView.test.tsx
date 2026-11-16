@@ -164,6 +164,7 @@ describe("ExplorerView", () => {
     render(<ExplorerView query={SAMPLE_QUERY} onBackToPortal={vi.fn()} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Toggle language" }));
+    fireEvent.click(screen.getByRole("button", { name: "Español (ES)" }));
     expect(
       screen.getByRole("heading", { name: "Comparar" })
     ).toBeInTheDocument();
