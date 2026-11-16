@@ -6,11 +6,11 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import {
-  BAND_CHANNELS,
   EXPLORER_CONFIG,
   EXPLORER_COPY,
   TIMELINE_TABS,
 } from "../../config/explorer";
+import type { BandChannelOption } from "../../config/explorer";
 import type {
   BandChannelId,
   ExplorerFrame,
@@ -20,6 +20,7 @@ import type {
 
 interface ExplorerTimelineProps {
   frames: ExplorerFrame[];
+  availableChannels: readonly BandChannelOption[];
   activeFrameId: string | null;
   timelineTab: TimelineFilterTab;
   bandFilter: BandChannelId | "all";
@@ -38,6 +39,7 @@ interface ExplorerTimelineProps {
 
 export function ExplorerTimeline({
   frames,
+  availableChannels,
   activeFrameId,
   timelineTab,
   bandFilter,
@@ -126,7 +128,7 @@ export function ExplorerTimeline({
             className="select select-bordered select-xs ae-field-input bg-[var(--ae-bg-elevated)] text-sm text-[var(--ae-text-primary)]"
           >
             <option value="all">{copy.bandAll}</option>
-            {BAND_CHANNELS.map((band) => (
+            {availableChannels.map((band) => (
               <option key={band.id} value={band.id}>
                 {`${copy.bandPrefix} ${band.id}`}
               </option>

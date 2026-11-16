@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  BAND_CHANNELS,
   DEFAULT_EXPLORER_FRAMES,
   DEFAULT_EXPLORER_LAYERS,
   EXPLORER_CONFIG,
+  type BandChannelOption,
 } from "../../config/explorer";
 import { requestFrameComparison } from "../../services/compareService";
 import { fetchExplorerFrames } from "../../services/framesService";
@@ -40,11 +42,54 @@ function getInitialFrameId(frames: readonly ExplorerFrame[]): string | null {
   return preferred?.id ?? frames[EXPLORER_CONFIG.firstIndex]?.id ?? null;
 }
 
+function channelsFromFrames(
+  frames: readonly ExplorerFrame[]
+): BandChannelOption[] {
+  const seen = new Set<BandChannelId>();
+  return frames.reduce<BandChannelOption[]>((channels, frame) => {
+    const detector = frame.detector ?? frame.band;
+    if (seen.has(detector)) {
+      return channels;
+    }
+    seen.add(detector);
+    const fallback = BAND_CHANNELS.find((channel) => channel.id === detector);
+    const min = frame.wavelengthMinUm?.toFixed(2);
+    const max = frame.wavelengthMaxUm?.toFixed(2);
+    channels.push({
+      id: detector,
+      label:
+        min && max
+          ? `Detector ${detector} (${min} – ${max} µm)`
+          : fallback?.label ?? `Detector ${detector}`,
+    });
+    return channels;
+  }, []);
+}
+
+function restrictLayers(
+  layers: ExplorerLayer[],
+  availableChannels: readonly BandChannelOption[]
+): ExplorerLayer[] {
+  if (availableChannels.length === 0) {
+    return layers;
+  }
+  const available = new Set(availableChannels.map((channel) => channel.id));
+  const firstDetector = availableChannels[EXPLORER_CONFIG.firstIndex].id;
+  return layers.map((layer) => {
+    const bands = layer.bands.filter((band) => available.has(band));
+    const selectedBands =
+      bands.length > 0 ? bands : [firstDetector];
+    return { ...layer, bands: selectedBands, band: selectedBands[0] };
+  });
+}
+
 export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
   const [locale, setLocale] = useState<ExplorerLocale>("en");
   const [layers, setLayers] = useState<ExplorerLayer[]>(() =>
     cloneLayers([...DEFAULT_EXPLORER_LAYERS])
   );
+  const [availableChannels, setAvailableChannels] =
+    useState<BandChannelOption[]>(() => [...BAND_CHANNELS]);
   const [activeLayerId, setActiveLayerId] = useState<string>(
     DEFAULT_EXPLORER_LAYERS[EXPLORER_CONFIG.firstIndex]?.id ?? ""
   );
@@ -85,6 +130,17 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
     ]).then(([metadata, remoteFrames]) => {
       if (controller.signal.aborted) {
         return;
+      }
+
+      if (remoteFrames.length > EXPLORER_CONFIG.firstIndex) {
+        const detectedChannels = channelsFromFrames(remoteFrames);
+        setAvailableChannels(detectedChannels);
+        setLayers((previous) =>
+          restrictLayers(previous, detectedChannels).map((layer) => ({
+            ...layer,
+            bands: [...layer.bands],
+          }))
+        );
       }
 
       if (
@@ -229,6 +285,9 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
       tint: "magma",
       bands: [1],
     };
+    const detector = availableChannels[EXPLORER_CONFIG.firstIndex]?.id ?? 1;
+    newLayer.band = detector;
+    newLayer.bands = [detector];
     pushSnapshot([newLayer, ...layers], newId);
   };
   */
@@ -427,6 +486,7 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
         >
           <LayersInspector
             layers={layers}
+            availableChannels={availableChannels}
             activeLayerId={activeLayerId}
             locale={locale}
             onUpdateLayer={handleUpdateLayer}
@@ -459,6 +519,7 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
 
       <ExplorerTimeline
         frames={frames}
+        availableChannels={availableChannels}
         activeFrameId={activeFrameId}
         timelineTab={timelineTab}
         bandFilter={bandFilter}

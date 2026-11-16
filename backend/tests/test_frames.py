@@ -112,6 +112,34 @@ def test_render_png_produces_png_bytes(monkeypatch, tmp_path):
     assert png.startswith(b"\x89PNG")
 
 
+def test_download_fits_image_crops_to_requested_sky_size(tmp_path):
+    import numpy as np
+    from astropy.io import fits
+    from astropy.wcs import WCS
+
+    path = tmp_path / "large.fits"
+    wcs = WCS(naxis=2)
+    wcs.wcs.crpix = [50, 50]
+    wcs.wcs.cdelt = [-0.01, 0.01]
+    wcs.wcs.crval = [10.0, 20.0]
+    wcs.wcs.ctype = ["RA---TAN", "DEC--TAN"]
+    fits.HDUList(
+        [
+            fits.PrimaryHDU(),
+            fits.ImageHDU(
+                np.ones((100, 100), dtype=np.float32), header=wcs.to_header()
+            ),
+        ]
+    ).writeto(path)
+
+    image, cropped_wcs = frames_service._download_fits_image(
+        str(path), 10.0, 20.0, 0.2
+    )
+
+    assert image.shape == (20, 20)
+    assert cropped_wcs.has_celestial
+
+
 def test_render_image_png_supports_multiple_bands():
     import numpy as np
     from astropy.wcs import WCS
@@ -133,6 +161,28 @@ def test_render_image_png_supports_multiple_bands():
     assert png.startswith(b"\x89PNG")
 
 
+def test_render_image_png_blends_views_with_different_shapes():
+    import numpy as np
+    from astropy.wcs import WCS
+
+    def loader(source):
+        shape = (16, 16) if source == "wide" else (14, 12)
+        return np.arange(np.prod(shape), dtype=float).reshape(shape), WCS()
+
+    png = render_image_png(
+        {
+            "sources": {1: "wide", 2: "narrow"},
+            "ra": 133.795,
+            "dec": -7.2455,
+        },
+        bands=[1, 2],
+        target_px=100,
+        image_loader=loader,
+    )
+
+    assert png.startswith(b"\x89PNG")
+
+
 def test_find_image_url_raises_not_found_for_date_without_images(monkeypatch):
     table = Table({"t_min": [_mjd("2025-05-05T10:00:00")], "access_url": ["u"]})
     monkeypatch.setattr(frames_service, "search_images", lambda ra, dec: table)
@@ -140,6 +190,56 @@ def test_find_image_url_raises_not_found_for_date_without_images(monkeypatch):
     assert frames_service._find_image_url(1.0, 2.0, date(2025, 5, 5)) == "u"
     with pytest.raises(ImageNotFoundError):
         frames_service._find_image_url(1.0, 2.0, date(2025, 5, 6))
+
+
+def test_legacy_single_band_uses_first_available_detector(monkeypatch):
+    table = Table(
+        {
+            "t_min": [
+                _mjd("2025-05-05T10:00:00"),
+                _mjd("2025-05-05T11:00:00"),
+            ],
+            "energy_bandpassname": ["SPHEREx-D3", "SPHEREx-D6"],
+            "access_url": ["d3", "d6"],
+        }
+    )
+    monkeypatch.setattr(frames_service, "search_images", lambda ra, dec: table)
+    monkeypatch.setattr(
+        frames_service,
+        "render_image_png",
+        lambda coords, **kwargs: coords["sources"],
+    )
+
+    result = frames_service.get_sky_image_png(
+        1.0, 2.0, date(2025, 5, 5), bands=(2,)
+    )
+
+    assert result == {3: "d3"}
+
+
+def test_comparison_uses_one_source_per_detector(monkeypatch):
+    table = Table(
+        {
+            "t_min": [
+                _mjd("2025-05-05T10:00:00"),
+                _mjd("2025-05-05T10:00:00"),
+            ],
+            "energy_bandpassname": ["SPHEREx-D1", "SPHEREx-D4"],
+            "access_url": ["d1", "d4"],
+        }
+    )
+    monkeypatch.setattr(frames_service, "search_images", lambda ra, dec: table)
+    monkeypatch.setattr(
+        frames_service,
+        "render_image_png",
+        lambda coords, **kwargs: coords["sources"],
+    )
+
+    result = frames_service.get_sky_image_png(
+        1.0, 3.0, date(2025, 5, 5), detectors=(1, 4)
+    )
+
+    assert result == {1: "d1", 4: "d4"}
 
 
 def test_image_download_retries_then_fails(monkeypatch):

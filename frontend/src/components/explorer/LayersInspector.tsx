@@ -6,6 +6,7 @@ import {
   EXPLORER_CONFIG,
   EXPLORER_COPY,
 } from "../../config/explorer";
+import type { BandChannelOption } from "../../config/explorer";
 import type {
   // BlendMode,
   ChannelTintId,
@@ -15,6 +16,7 @@ import type {
 
 interface LayersInspectorProps {
   layers: ExplorerLayer[];
+  availableChannels: readonly BandChannelOption[];
   activeLayerId: string;
   locale: ExplorerLocale;
   onSelectLayer?: (id: string) => void;
@@ -26,6 +28,7 @@ interface LayersInspectorProps {
 
 export function LayersInspector({
   layers,
+  availableChannels,
   activeLayerId,
   locale,
   onUpdateLayer,
@@ -151,7 +154,7 @@ export function LayersInspector({
                 aria-label={copy.bandChannel}
                 className="grid gap-1.5"
               >
-                {BAND_CHANNELS.map((channel) => (
+                {availableChannels.map((channel) => (
                   <label
                     key={channel.id}
                     className="flex cursor-pointer items-start gap-2 rounded border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-base)] px-2 py-1.5 text-sm text-[var(--ae-text-primary)]"

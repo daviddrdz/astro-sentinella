@@ -62,6 +62,19 @@ def _download_fits_image(
                 flags_data = np.asarray(hdul["FLAGS"].data, dtype=np.uint32)
                 image_data[(flags_data & BAD_PIXEL_MASK) != 0] = np.nan
 
+        if wcs.has_celestial and size_deg > 0:
+            position = SkyCoord(ra_deg * u.deg, dec_deg * u.deg, frame="icrs")
+            cutout = Cutout2D(
+                image_data,
+                position,
+                size=u.Quantity(size_deg, u.deg),
+                wcs=wcs,
+                mode="partial",
+                fill_value=np.nan,
+            )
+            image_data = cutout.data
+            wcs = cutout.wcs
+
         finite = np.isfinite(image_data)
         if not np.any(finite):
             return np.zeros_like(image_data, dtype=np.float32), wcs
@@ -99,6 +112,34 @@ def _load_view(
     if not np.isfinite(low) or not np.isfinite(high) or low == high:
         raise ValueError("Not enough variation in the image to render it")
     return view, float(low), float(high)
+
+
+def _blend_views(
+    views: list[tuple[np.ndarray, float, float]],
+) -> tuple[np.ndarray, float, float]:
+    """Normalize and average aligned detector views into one composite image."""
+    target_height = max(view.shape[0] for view, _, _ in views)
+    target_width = max(view.shape[1] for view, _, _ in views)
+    normalized = []
+    valid_masks = []
+    for view, low, high in views:
+        normalized_view = np.clip((view - low) / (high - low), 0.0, 1.0)
+        valid = np.isfinite(normalized_view)
+        height_padding = target_height - view.shape[0]
+        width_padding = target_width - view.shape[1]
+        padding = (
+            (height_padding // 2, height_padding - height_padding // 2),
+            (width_padding // 2, width_padding - width_padding // 2),
+        )
+        normalized.append(
+            np.pad(np.nan_to_num(normalized_view, nan=0.0), padding, constant_values=0.0)
+        )
+        valid_masks.append(np.pad(valid, padding, constant_values=False))
+
+    values = np.stack(normalized)
+    weights = np.stack(valid_masks)
+    composite = values.sum(axis=0) / np.maximum(weights.sum(axis=0), 1)
+    return composite, 0.0, 1.0
 
 
 def render_image_png(
@@ -184,30 +225,19 @@ def render_image_png(
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    n_views = len(views)
-    if n_views == 1:
-        view, low, high = views[0]
-        height, width = view.shape
-        scale = max(1, target_px // max(height, width))
-        fig = Figure(
-            figsize=(width * scale / 100, height * scale / 100),
-            dpi=100,
-            facecolor="black",
-        )
-        axes = [fig.add_axes((0, 0, 1, 1))]
-    else:
-        ncols = min(3, n_views)
-        nrows = (n_views + ncols - 1) // ncols
-        panel_px = max(1, target_px // max(ncols, nrows))
-        fig, subplot_axes = plt.subplots(
-            nrows=nrows,
-            ncols=ncols,
-            figsize=(ncols * panel_px / 100, nrows * panel_px / 100),
-            dpi=100,
-            facecolor="black",
-            squeeze=False,
-        )
-        axes = list(subplot_axes.flat)
+    composite = selected_bands is not None and len(views) > 1
+    if composite:
+        views = [_blend_views(views)]
+
+    view, low, high = views[0]
+    height, width = view.shape
+    scale = max(1, target_px // max(height, width))
+    fig = Figure(
+        figsize=(width * scale / 100, height * scale / 100),
+        dpi=100,
+        facecolor="black",
+    )
+    axes = [fig.add_axes((0, 0, 1, 1))]
 
     cmap_name = "gray" if color == "grey" else color
     for axis, (view, low, high) in zip(axes, views):
@@ -224,9 +254,9 @@ def render_image_png(
         axis.set_xlim(-0.5, view.shape[1] - 0.5)
         axis.set_ylim(-0.5, view.shape[0] - 0.5)
 
-    if selected_bands is not None:
+    if selected_bands is not None and not composite:
         for axis, band in zip(axes, selected_bands):
-            axis.set_title(f"Band {band}", color="white", fontsize=10)
+            axis.set_title(f"Detector {band}", color="white", fontsize=10)
         for axis in axes[len(views):]:
             axis.axis("off")
 
