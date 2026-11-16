@@ -48,6 +48,8 @@ def frame_image():
             options["color"] = query.color
         if "bands" in request.args:
             options["bands"] = query.bands or None
+        if query.detectors:
+            options["detectors"] = query.detectors
         png_bytes = get_sky_image_png(
             query.ra_deg, query.dec_deg, query.observation_date, **options
         )

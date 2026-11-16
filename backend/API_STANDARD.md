@@ -5,7 +5,18 @@ This document defines conventions for implementing the Flask API consumed by the
 ## Current Frontend Contracts
 
 - `GET /api/metadata?ra={ra}&dec={dec}` returns coordinate metadata used to populate available observation dates.
+- `GET /api/metadata/detectors?ra={ra}&dec={dec}&observationDate={date}` returns the
+  detector files available for one date, including their wavelength ranges. This
+  endpoint only queries SIA2 metadata; it does not download FITS data.
 - `GET /api/frames?ra={ra}&dec={dec}&fieldSizeDeg={degrees}&observationDate={date}` returns the frames for an explorer query.
+- `GET /api/frames/image?...&detector={1-6}` renders one detector on demand.
+  `detectors=1,2,...` renders a comparison. The first available detector is used
+  when no detector is specified.
+
+Detector ranges are fixed by the SPHEREx instrument: D1 `0.75–1.11 µm`, D2
+`1.11–1.66 µm`, D3 `1.64–2.42 µm`, D4 `2.42–3.18 µm`, D5 `3.18–4.41 µm`,
+and D6 `4.41–5.00 µm`. FITS data is cached per detector URL after its first
+render, so selecting a date does not download all six files.
 
 Keep these contracts aligned with the frontend types and service validation in `frontend/src/types/portal.ts`, `frontend/src/types/explorer.ts`, `frontend/src/services/metadataService.ts`, and `frontend/src/services/framesService.ts`.
 

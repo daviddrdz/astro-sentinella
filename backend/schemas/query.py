@@ -27,6 +27,7 @@ class SkyImageQuery:
     field_size_deg: float = 0.05
     color: str = "magma"
     bands: tuple[int, ...] = ()
+    detectors: tuple[int, ...] = ()
 
 
 def _required(args: Mapping[str, str], name: str) -> str:
@@ -93,16 +94,16 @@ def parse_sky_image_query(args: Mapping[str, str]) -> SkyImageQuery:
             f"'color' must be one of: {', '.join(VALID_RENDER_COLORS)}."
         )
 
-    raw_bands = (args.get("bands") or "").strip()
+    raw_bands = (args.get("detectors") or args.get("bands") or args.get("detector") or "").strip()
     if raw_bands:
         try:
             bands = tuple(int(value.strip()) for value in raw_bands.split(","))
         except ValueError:
-            raise QueryValidationError("'bands' must be a comma-separated list of integers.") from None
+            raise QueryValidationError("'detectors' must be a comma-separated list of integers.") from None
         if not bands or any(band not in VALID_RENDER_BANDS for band in bands):
-            raise QueryValidationError("'bands' must contain values from 1 to 6.")
+            raise QueryValidationError("'detectors' must contain values from 1 to 6.")
         if len(set(bands)) != len(bands):
-            raise QueryValidationError("'bands' must not contain duplicate values.")
+            raise QueryValidationError("'detectors' must not contain duplicate values.")
     else:
         bands = ()
 
@@ -112,5 +113,6 @@ def parse_sky_image_query(args: Mapping[str, str]) -> SkyImageQuery:
         observation_date,
         field_size_deg,
         color,
+        bands,
         bands,
     )
