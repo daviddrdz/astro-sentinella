@@ -11,7 +11,9 @@ This document defines conventions for implementing the Flask API consumed by the
 - `GET /api/frames?ra={ra}&dec={dec}&fieldSizeDeg={degrees}&observationDate={date}` returns the frames for an explorer query.
 - `GET /api/frames/image?...&detector={1-6}` renders one detector on demand.
   `detectors=1,2,...` renders a comparison. The first available detector is used
-  when no detector is specified.
+  when no detector is specified. The legacy single-value `bands=2` parameter
+  also falls back to the first available detector when that detector is absent
+  on the selected date; explicit `detector` requests remain strict.
 
 Detector ranges are fixed by the SPHEREx instrument: D1 `0.75–1.11 µm`, D2
 `1.11–1.66 µm`, D3 `1.64–2.42 µm`, D4 `2.42–3.18 µm`, D5 `3.18–4.41 µm`,

@@ -142,6 +142,28 @@ def test_find_image_url_raises_not_found_for_date_without_images(monkeypatch):
         frames_service._find_image_url(1.0, 2.0, date(2025, 5, 6))
 
 
+def test_legacy_single_band_falls_back_to_first_available_detector(monkeypatch):
+    table = Table(
+        {
+            "t_min": [_mjd("2025-05-05T10:00:00")],
+            "energy_bandpassname": ["SPHEREx-D3"],
+            "access_url": ["d3"],
+        }
+    )
+    monkeypatch.setattr(frames_service, "search_images", lambda ra, dec: table)
+    monkeypatch.setattr(
+        frames_service,
+        "render_image_png",
+        lambda coords, **kwargs: coords["sources"],
+    )
+
+    result = frames_service.get_sky_image_png(
+        1.0, 2.0, date(2025, 5, 5), bands=(2,)
+    )
+
+    assert result == {3: "d3"}
+
+
 def test_image_download_retries_then_fails(monkeypatch):
     attempts = []
     monkeypatch.setattr(irsa_archive.time, "sleep", lambda _: None)

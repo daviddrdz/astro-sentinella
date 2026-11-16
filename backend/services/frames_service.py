@@ -1,4 +1,5 @@
 from datetime import date
+import logging
 
 import numpy as np
 from astropy.table import Table
@@ -10,6 +11,7 @@ from services.image_renderer import _download_fits_image, render_image_png
 from services.irsa_archive import ArchiveUnavailableError, search_images
 
 conf.remote_timeout = 120
+logger = logging.getLogger(__name__)
 
 PNG_CACHE = TTLCache(ttl_s=3600, max_items=32)
 FITS_CACHE = TTLCache(ttl_s=3600, max_items=32)
@@ -199,14 +201,27 @@ def get_sky_image_png(
     bands: tuple[int, ...] | None = None,
     detectors: tuple[int, ...] | None = None,
 ) -> bytes:
-    selected_detectors = detectors or bands
+    requested_detectors = detectors if detectors is not None else bands
     key = (
         round(ra_deg, 5), round(dec_deg, 5), observation_date, size_deg, color,
-        selected_detectors,
+        requested_detectors,
     )
 
     def compute():
         table = search_images(ra_deg, dec_deg)
+        selected_detectors = requested_detectors
+        if detectors is None and len(requested_detectors or ()) == 1:
+            requested_detector = requested_detectors[0]
+            if select_image_url_for_date(table, observation_date, requested_detector) is None:
+                available = available_detectors_for_date(table, observation_date)
+                if available:
+                    selected_detectors = (available[0]["detector"],)
+                    logger.info(
+                        "Legacy band %d is unavailable on %s; using detector %d.",
+                        requested_detector,
+                        observation_date.isoformat(),
+                        selected_detectors[0],
+                    )
         if selected_detectors:
             sources = {
                 detector: select_image_url_for_date(table, observation_date, detector)

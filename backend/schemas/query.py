@@ -94,7 +94,8 @@ def parse_sky_image_query(args: Mapping[str, str]) -> SkyImageQuery:
             f"'color' must be one of: {', '.join(VALID_RENDER_COLORS)}."
         )
 
-    raw_bands = (args.get("detectors") or args.get("bands") or args.get("detector") or "").strip()
+    raw_detectors = (args.get("detectors") or args.get("detector") or "").strip()
+    raw_bands = (raw_detectors or args.get("bands") or "").strip()
     if raw_bands:
         try:
             bands = tuple(int(value.strip()) for value in raw_bands.split(","))
@@ -106,6 +107,7 @@ def parse_sky_image_query(args: Mapping[str, str]) -> SkyImageQuery:
             raise QueryValidationError("'detectors' must not contain duplicate values.")
     else:
         bands = ()
+    detectors = bands if raw_detectors else ()
 
     return SkyImageQuery(
         coords.ra_deg,
@@ -114,5 +116,5 @@ def parse_sky_image_query(args: Mapping[str, str]) -> SkyImageQuery:
         field_size_deg,
         color,
         bands,
-        bands,
+        detectors,
     )
