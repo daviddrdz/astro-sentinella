@@ -208,7 +208,7 @@ export const EXPLORER_COPY: Record<
     frameUnavailable:
       "Frame unavailable or rate-limited. Wait a moment and retry.",
     retryFrame: "Retry",
-    spectrumTitle: "Chunk spectrum",
+    spectrumTitle: "Spectrum",
     spectrumHint:
       "Click anywhere on the frame to see the spectrum of that area.",
     spectrumLoading: "Extracting spectrum from the 102 SPHEREx channels...",
@@ -271,7 +271,7 @@ export const EXPLORER_COPY: Record<
     frameUnavailable:
       "Fotograma no disponible o límite de peticiones alcanzado.",
     retryFrame: "Reintentar",
-    spectrumTitle: "Espectro del chunk",
+    spectrumTitle: "Espectro",
     spectrumHint: "Haz clic en el frame para ver el espectro de esa zona.",
     spectrumLoading: "Extrayendo el espectro de los 102 canales SPHEREx...",
     spectrumError: "Espectro no disponible. Intenta de nuevo en un momento.",
@@ -389,21 +389,26 @@ export const DEFAULT_EXPLORER_FRAMES: readonly ExplorerFrame[] = [
   },
 ];
 
-/** Geometry and styling of the inline spectrum chart (SVG user units). */
+/**
+ * Geometry of the inline spectrum chart (SVG user units). `width` matches the
+ * panel's inner width (--ae-inspector-width minus its 2rem padding) so the
+ * chart renders 1:1 and its --ae-text-sm labels stay at their token size.
+ * Colors, fonts and radii come from styles/tokens.css, never from here.
+ */
 export const SPECTRUM_CHART = {
-  width: 360,
-  height: 220,
-  margin: { top: 22, right: 12, bottom: 36, left: 52 },
+  width: 272,
+  height: 208,
+  margin: { top: 26, right: 10, bottom: 44, left: 56 },
   xTicksUm: [1, 2, 3, 4, 5],
   xDomainMinUm: 0.7,
   xDomainMaxUm: 5.1,
   yTickTarget: 4,
   yPadRatio: 0.08,
   yLabelGap: 6,
-  xLabelOffset: 14,
+  xLabelOffset: 18,
   axisTitleInset: 4,
-  yTitleX: 11,
-  refLabelGap: 6,
+  refLabelGap: 8,
+  refDash: "2 3",
   lineWidth: 2,
   markerRadius: 4,
   markerRing: 2,
@@ -411,8 +416,8 @@ export const SPECTRUM_CHART = {
   crosshairOpacity: 0.6,
   coordDecimals: 1,
   wavelengthDecimals: 3,
-  tooltipMinPct: 20,
-  tooltipMaxPct: 80,
+  tooltipMinPct: 28,
+  tooltipMaxPct: 72,
   percent: 100,
   half: 2,
   /** Common bright features in SPHEREx spectra, drawn as faint references. */
