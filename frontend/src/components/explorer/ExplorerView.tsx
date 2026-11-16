@@ -57,7 +57,7 @@ function channelsFromFrames(
       label:
         min && max
           ? `Detector ${detector} (${min} – ${max} µm)`
-          : fallback?.label ?? `Detector ${detector}`,
+          : (fallback?.label ?? `Detector ${detector}`),
     });
     return channels;
   }, []);
@@ -74,8 +74,7 @@ function restrictLayers(
   const firstDetector = availableChannels[EXPLORER_CONFIG.firstIndex].id;
   return layers.map((layer) => {
     const bands = layer.bands.filter((band) => available.has(band));
-    const selectedBands =
-      bands.length > 0 ? bands : [firstDetector];
+    const selectedBands = bands.length > 0 ? bands : [firstDetector];
     return { ...layer, bands: selectedBands, band: selectedBands[0] };
   });
 }
@@ -85,8 +84,9 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
   const [layers, setLayers] = useState<ExplorerLayer[]>(() =>
     cloneLayers([...DEFAULT_EXPLORER_LAYERS])
   );
-  const [availableChannels, setAvailableChannels] =
-    useState<BandChannelOption[]>(() => [...BAND_CHANNELS]);
+  const [availableChannels, setAvailableChannels] = useState<
+    BandChannelOption[]
+  >(() => [...BAND_CHANNELS]);
   const [activeLayerId, setActiveLayerId] = useState<string>(
     DEFAULT_EXPLORER_LAYERS[EXPLORER_CONFIG.firstIndex]?.id ?? ""
   );

@@ -165,7 +165,9 @@ export function LayersInspector({
                       checked={activeLayer.bands.includes(channel.id)}
                       onChange={() => {
                         const bands = activeLayer.bands.includes(channel.id)
-                          ? activeLayer.bands.filter((band) => band !== channel.id)
+                          ? activeLayer.bands.filter(
+                              (band) => band !== channel.id
+                            )
                           : [...activeLayer.bands, channel.id].sort(
                               (a, b) => a - b
                             );
