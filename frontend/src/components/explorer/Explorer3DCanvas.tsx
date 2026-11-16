@@ -1,12 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Compass,
-  Crosshair,
-  Loader2,
-  Maximize2,
-  Minimize2,
-  Sparkles,
-} from "lucide-react";
+import { Loader2 } from "lucide-react";
 import * as THREE from "three";
 import {
   bvToRgb,
@@ -1322,10 +1315,11 @@ export function Explorer3DCanvas({
       />
 
       {webglUnavailable && (
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 text-center text-slate-300">
-          <Sparkles className="h-8 w-8 text-cyan-400" />
-          <p className="text-sm font-medium">{copy.webglFallbackTitle}</p>
-          <p className="max-w-sm text-xs text-slate-400">
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 text-center text-[var(--ae-text-secondary)]">
+          <p className="text-[length:var(--ae-text-base)] font-medium text-[var(--ae-text-primary)]">
+            {copy.webglFallbackTitle}
+          </p>
+          <p className="max-w-sm text-[length:var(--ae-text-sm)] text-[var(--ae-text-muted)]">
             {copy.webglFallbackDesc}
           </p>
         </div>
@@ -1338,7 +1332,7 @@ export function Explorer3DCanvas({
               <div
                 key={item.id}
                 style={{ left: item.x, top: item.y }}
-                className="absolute -translate-x-1/2 -translate-y-full pb-1 text-[10px] tracking-wide text-slate-300/75 drop-shadow"
+                className="absolute -translate-x-1/2 -translate-y-full pb-1 text-xs tracking-wide text-[var(--ae-text-secondary)] drop-shadow"
               >
                 {item.label}
               </div>
@@ -1353,13 +1347,13 @@ export function Explorer3DCanvas({
                 className="absolute -translate-x-1/2 -translate-y-full pb-1.5 text-center"
               >
                 <span
-                  className="rounded-full border border-white/15 bg-slate-950/75 px-2 py-0.5 text-[10px] font-medium text-slate-100 backdrop-blur-sm"
+                  className="rounded-full border border-[var(--ae-border-strong)] bg-[var(--ae-bg-surface)]/90 px-2.5 py-0.5 text-xs font-medium text-[var(--ae-text-primary)]"
                   style={item.color ? { color: item.color } : undefined}
                 >
                   {item.label}
                 </span>
                 {item.sublabel && (
-                  <div className="mt-0.5 text-[9px] text-cyan-300">
+                  <div className="mt-0.5 text-xs text-[var(--ae-accent-primary)]">
                     {item.sublabel}
                   </div>
                 )}
@@ -1377,12 +1371,12 @@ export function Explorer3DCanvas({
                 if (item.target) handleSelectTarget(item.target);
               }}
               style={{ left: item.x, top: item.y }}
-              className="pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 flex items-center gap-1.5 rounded-full border border-cyan-400/50 bg-slate-950/80 px-2.5 py-1 text-[11px] font-medium text-cyan-100 shadow-lg backdrop-blur-md transition hover:border-cyan-300 hover:bg-cyan-950/80"
+              className="pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 flex items-center gap-1.5 rounded-full border border-[var(--ae-accent-primary)] bg-[var(--ae-bg-surface)]/90 px-3 py-1 text-xs font-medium text-[var(--ae-text-primary)] shadow-lg backdrop-blur-md transition hover:bg-[var(--ae-bg-hover)]"
             >
-              <span className="h-1.5 w-1.5 rounded-full bg-cyan-400" />
+              <span className="h-2 w-2 rounded-full bg-[var(--ae-accent-primary)]" />
               <span>{item.label}</span>
               {item.sublabel && (
-                <span className="text-[9px] text-cyan-300/80">
+                <span className="text-xs text-[var(--ae-text-muted)]">
                   {item.sublabel}
                 </span>
               )}
@@ -1392,23 +1386,22 @@ export function Explorer3DCanvas({
       </div>
 
       <div className="pointer-events-none absolute top-4 left-4 flex flex-col gap-2">
-        <div className="pointer-events-auto flex items-center gap-2 rounded-lg border border-white/10 bg-slate-950/75 px-3 py-1.5 text-xs text-slate-200 backdrop-blur-md">
-          <Compass className="h-3.5 w-3.5 text-cyan-400" />
-          <span className="font-mono text-[11px]">
+        <div className="pointer-events-auto flex items-center gap-2 rounded-[var(--ae-radius-md)] border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-surface)]/90 px-3 py-1.5 text-[length:var(--ae-text-sm)] text-[var(--ae-text-primary)] backdrop-blur-md">
+          <span className="font-mono">
             {copy.raLabel} {targetRaDeg.toFixed(R.two)}° · {copy.decLabel}{" "}
             {targetDecDeg.toFixed(R.two)}°
           </span>
           {scale === "sky-view" && (
-            <span className="border-l border-white/10 pl-2 font-mono text-[11px] text-cyan-300">
+            <span className="border-l border-[var(--ae-border-subtle)] pl-2 font-mono text-[var(--ae-accent-primary)]">
               {copy.fovLabel} {hudFov}°
             </span>
           )}
         </div>
 
-        <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-slate-950/65 px-3 py-1 text-[11px] text-slate-300 backdrop-blur-md">
+        <div className="flex items-center gap-2 rounded-[var(--ae-radius-md)] border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-surface)]/85 px-3 py-1 text-[length:var(--ae-text-sm)] text-[var(--ae-text-muted)] backdrop-blur-md">
           {loadingStars ? (
             <>
-              <Loader2 className="h-3 w-3 animate-spin text-cyan-400" />
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--ae-accent-primary)]" />
               <span>{copy.loadingCatalog}</span>
             </>
           ) : (
@@ -1423,7 +1416,7 @@ export function Explorer3DCanvas({
       </div>
 
       <div
-        className="absolute top-4 right-4 flex items-center gap-1.5"
+        className="absolute top-4 right-4 flex items-center gap-2"
         onPointerDown={(e) => e.stopPropagation()}
       >
         <button
@@ -1435,10 +1428,9 @@ export function Explorer3DCanvas({
               SKY3D_CONSTANTS.defaultFovDeg
             )
           }
-          className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-slate-950/80 px-2.5 py-1.5 text-xs font-medium text-slate-200 backdrop-blur-md transition hover:border-cyan-400/50 hover:text-cyan-200"
+          className="rounded-[var(--ae-radius-md)] border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-surface)]/90 px-3 py-1.5 text-[length:var(--ae-text-sm)] font-medium text-[var(--ae-text-primary)] backdrop-blur-md transition hover:border-[var(--ae-border-strong)] hover:bg-[var(--ae-bg-hover)]"
         >
-          <Crosshair className="h-3.5 w-3.5 text-cyan-400" />
-          <span>{copy.recenterTarget}</span>
+          {copy.recenterTarget}
         </button>
 
         {scale === "sky-view" && (
@@ -1452,10 +1444,9 @@ export function Explorer3DCanvas({
                   SKY3D_CONSTANTS.telescopeFovDeg
                 )
               }
-              className="flex items-center gap-1 rounded-lg border border-white/10 bg-slate-950/80 px-2.5 py-1.5 text-xs text-slate-200 backdrop-blur-md transition hover:border-cyan-400/50 hover:text-cyan-200"
+              className="rounded-[var(--ae-radius-md)] border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-surface)]/90 px-3 py-1.5 text-[length:var(--ae-text-sm)] font-medium text-[var(--ae-text-primary)] backdrop-blur-md transition hover:border-[var(--ae-border-strong)] hover:bg-[var(--ae-bg-hover)]"
             >
-              <Minimize2 className="h-3.5 w-3.5 text-cyan-400" />
-              <span>{copy.telescopeView}</span>
+              {copy.telescopeView}
             </button>
             <button
               type="button"
@@ -1466,10 +1457,9 @@ export function Explorer3DCanvas({
                   SKY3D_CONSTANTS.wideSkyFovDeg
                 )
               }
-              className="flex items-center gap-1 rounded-lg border border-white/10 bg-slate-950/80 px-2.5 py-1.5 text-xs text-slate-200 backdrop-blur-md transition hover:border-cyan-400/50 hover:text-cyan-200"
+              className="rounded-[var(--ae-radius-md)] border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-surface)]/90 px-3 py-1.5 text-[length:var(--ae-text-sm)] font-medium text-[var(--ae-text-primary)] backdrop-blur-md transition hover:border-[var(--ae-border-strong)] hover:bg-[var(--ae-bg-hover)]"
             >
-              <Maximize2 className="h-3.5 w-3.5 text-cyan-400" />
-              <span>{copy.wideSkyView}</span>
+              {copy.wideSkyView}
             </button>
           </>
         )}
@@ -1481,16 +1471,16 @@ export function Explorer3DCanvas({
             left: hoveredStar.screenX + R.tooltipOffsetX,
             top: hoveredStar.screenY - R.tooltipOffsetY,
           }}
-          className="pointer-events-none absolute z-20 rounded-lg border border-cyan-400/35 bg-slate-950/90 px-2.5 py-1.5 text-[11px] text-slate-100 shadow-lg backdrop-blur-md"
+          className="pointer-events-none absolute z-20 rounded-[var(--ae-radius-md)] border border-[var(--ae-border-strong)] bg-[var(--ae-bg-surface)]/95 px-3 py-2 text-[length:var(--ae-text-sm)] text-[var(--ae-text-primary)] shadow-lg backdrop-blur-md"
         >
-          <div className="flex items-center gap-1.5 font-medium">
+          <div className="flex items-center gap-2 font-medium">
             <span
-              className="h-2 w-2 rounded-full"
+              className="h-2.5 w-2.5 rounded-full"
               style={{ backgroundColor: hoveredStar.colorCss }}
             />
             <span>{hoveredStar.name ?? copy.unnamedStar}</span>
           </div>
-          <div className="mt-0.5 font-mono text-[10px] text-slate-300">
+          <div className="mt-0.5 font-mono text-xs text-[var(--ae-text-secondary)]">
             {copy.magnitudeLabel} {hoveredStar.mag.toFixed(R.two)} ·{" "}
             {Math.round(hoveredStar.distPc * SKY3D_CONSTANTS.pcToLy)} ly ·{" "}
             {hoveredStar.spectralClass}
@@ -1503,7 +1493,7 @@ export function Explorer3DCanvas({
         onPointerDown={(e) => e.stopPropagation()}
       >
         <div
-          className="flex items-center gap-1 rounded-full border border-white/15 bg-slate-950/85 p-1 shadow-xl backdrop-blur-md"
+          className="flex items-center gap-1 rounded-full border border-[var(--ae-border-strong)] bg-[var(--ae-bg-surface)]/90 p-1 shadow-xl backdrop-blur-md"
           role="tablist"
           aria-label="3D Space Scale"
         >
@@ -1518,10 +1508,10 @@ export function Explorer3DCanvas({
                 role="tab"
                 aria-selected={active}
                 onClick={() => handleSelectScale(id)}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                className={`rounded-full px-3.5 py-1 text-[length:var(--ae-text-sm)] font-medium transition ${
                   active
-                    ? "bg-cyan-500/25 text-cyan-200 ring-1 ring-cyan-400/50"
-                    : "text-slate-300 hover:bg-white/5 hover:text-white"
+                    ? "bg-[var(--ae-accent-primary)] text-[var(--ae-accent-primary-content)]"
+                    : "text-[var(--ae-text-secondary)] hover:bg-[var(--ae-bg-hover)] hover:text-[var(--ae-text-primary)]"
                 }`}
               >
                 {copy.scales[id]}
@@ -1529,7 +1519,7 @@ export function Explorer3DCanvas({
             );
           })}
         </div>
-        <div className="text-[10px] text-slate-400">
+        <div className="text-xs text-[var(--ae-text-muted)]">
           {copy.scaleSubtitles[scale]} · {copy.dragHint} · {copy.scrollHint}
           {(scale === "sky-view" || scale === "neighborhood") &&
             ` · ${copy.starClickHint}`}

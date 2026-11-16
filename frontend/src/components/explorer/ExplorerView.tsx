@@ -661,15 +661,17 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
           aria-label="Compare inspector"
           className="hidden w-80 shrink-0 overflow-y-auto border-l border-[var(--ae-border-subtle)] bg-[var(--ae-bg-base)] md:flex md:flex-col"
         >
-          <SkyObjectInspector
-            query={activeQuery}
-            locale={locale}
-            selectedObject={selectedSkyObject}
-            onClearSelection={() => setSelectedSkyObject(null)}
-            onSelectTarget={handleSelectFeaturedTarget}
-            onCenterObject={handleCenterSkyObject}
-            onSyncToQuery={handleSyncObjectToQuery}
-          />
+          {viewMode === "3d" && (
+            <SkyObjectInspector
+              query={activeQuery}
+              locale={locale}
+              selectedObject={selectedSkyObject}
+              onClearSelection={() => setSelectedSkyObject(null)}
+              onSelectTarget={handleSelectFeaturedTarget}
+              onCenterObject={handleCenterSkyObject}
+              onSyncToQuery={handleSyncObjectToQuery}
+            />
+          )}
           <LayersInspector
             layers={layers}
             availableChannels={availableChannels}

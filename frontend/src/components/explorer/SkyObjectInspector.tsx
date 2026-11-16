@@ -1,4 +1,3 @@
-import { Compass, Crosshair, Layers, Sparkles, X } from "lucide-react";
 import {
   SKY_3D_COPY,
   SKY3D_CONSTANTS,
@@ -34,23 +33,19 @@ export function SkyObjectInspector({
   return (
     <section
       aria-label={copy.inspectorTitle}
-      className="border-b border-[var(--ae-border-subtle)] p-3"
+      className="border-b border-[var(--ae-border-subtle)] bg-[var(--ae-bg-base)] p-4"
       data-testid="sky-object-inspector"
     >
-      <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-[var(--ae-text-primary)] uppercase">
-          <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
-          <span>{copy.inspectorTitle}</span>
-        </div>
-      </div>
+      <h2 className="mb-3 text-[length:var(--ae-text-sm)] font-semibold tracking-tight text-[var(--ae-text-primary)]">
+        {copy.inspectorTitle}
+      </h2>
 
       {/* Shared 2D & 3D Active Coordinates */}
-      <div className="mb-2.5 rounded-lg border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-elevated)] px-2.5 py-2 text-[11px]">
-        <div className="mb-1 flex items-center gap-1 text-[10px] font-medium text-[var(--ae-text-muted)] uppercase">
-          <Compass className="h-3 w-3 text-cyan-400" />
-          <span>{copy.activeRegionTitle}</span>
+      <div className="mb-3 rounded-[var(--ae-radius-md)] border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-elevated)] px-3 py-2.5">
+        <div className="mb-1 text-[length:var(--ae-text-sm)] font-medium text-[var(--ae-text-muted)]">
+          {copy.activeRegionTitle}
         </div>
-        <div className="font-mono text-[10px] text-[var(--ae-text-secondary)]">
+        <div className="font-mono text-[length:var(--ae-text-sm)] text-[var(--ae-text-secondary)]">
           <div>
             {copy.raLabel}: {query.ra}
           </div>
@@ -61,22 +56,22 @@ export function SkyObjectInspector({
       </div>
 
       {/* Selected Star or Target Details */}
-      {selectedObject ? (
+      {selectedObject && (
         <div
           data-testid="inspector-selected-object"
-          className="rounded-lg border border-cyan-400/35 bg-cyan-950/20 p-2.5 text-xs"
+          className="mb-3 rounded-[var(--ae-radius-md)] border border-[var(--ae-border-strong)] bg-[var(--ae-bg-surface)] p-3"
         >
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-2">
               <span
-                className="h-3 w-3 shrink-0 rounded-full ring-2 ring-white/20"
+                className="h-3 w-3 shrink-0 rounded-full ring-1 ring-[var(--ae-border-strong)]"
                 style={{ backgroundColor: selectedObject.colorCss }}
               />
               <div>
-                <div className="font-semibold text-cyan-200">
+                <div className="text-[length:var(--ae-text-base)] font-semibold text-[var(--ae-text-primary)]">
                   {selectedObject.name}
                 </div>
-                <div className="text-[11px] text-[var(--ae-text-muted)]">
+                <div className="text-[length:var(--ae-text-sm)] text-[var(--ae-text-muted)]">
                   {selectedObject.subtitle}
                 </div>
               </div>
@@ -84,28 +79,21 @@ export function SkyObjectInspector({
             <button
               type="button"
               onClick={onClearSelection}
-              className="rounded p-0.5 text-[var(--ae-text-muted)] hover:text-[var(--ae-text-primary)]"
+              className="rounded px-1.5 py-0.5 text-[length:var(--ae-text-sm)] text-[var(--ae-text-muted)] hover:bg-[var(--ae-bg-hover)] hover:text-[var(--ae-text-primary)]"
               aria-label="Clear selected celestial object"
             >
-              <X className="h-3.5 w-3.5" />
+              ×
             </button>
           </div>
 
-          <dl className="mt-2.5 space-y-1 font-mono text-[10px] text-[var(--ae-text-secondary)]">
+          <dl className="mt-3 space-y-1.5 font-mono text-[length:var(--ae-text-sm)] text-[var(--ae-text-secondary)]">
             <div className="flex justify-between gap-2">
               <dt className="text-[var(--ae-text-muted)]">{copy.raLabel}</dt>
-              <dd>
-                {selectedObject.raDisplay} (
-                {selectedObject.raDeg.toFixed(R.two)}
-                °)
-              </dd>
+              <dd>{selectedObject.raDisplay}</dd>
             </div>
             <div className="flex justify-between gap-2">
               <dt className="text-[var(--ae-text-muted)]">{copy.decLabel}</dt>
-              <dd>
-                {selectedObject.decDisplay} (
-                {selectedObject.decDeg.toFixed(R.two)}°)
-              </dd>
+              <dd>{selectedObject.decDisplay}</dd>
             </div>
             <div className="flex justify-between gap-2">
               <dt className="text-[var(--ae-text-muted)]">
@@ -113,7 +101,6 @@ export function SkyObjectInspector({
               </dt>
               <dd>
                 {Math.round(selectedObject.distPc * SKY3D_CONSTANTS.pcToLy)} ly
-                ({selectedObject.distPc.toFixed(1)} pc)
               </dd>
             </div>
             {typeof selectedObject.mag === "number" && (
@@ -126,37 +113,31 @@ export function SkyObjectInspector({
             )}
           </dl>
 
-          <div className="mt-2.5 grid grid-cols-2 gap-1.5">
+          <div className="mt-3 grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={() => onCenterObject(selectedObject)}
-              className="flex items-center justify-center gap-1 rounded-md border border-cyan-400/40 bg-cyan-500/15 px-2 py-1.5 text-[11px] font-medium text-cyan-200 transition hover:bg-cyan-500/25"
+              className="rounded-[var(--ae-radius-sm)] bg-[var(--ae-accent-primary)] px-2.5 py-1.5 text-[length:var(--ae-text-sm)] font-medium text-[var(--ae-accent-primary-content)] transition hover:opacity-90"
             >
-              <Crosshair className="h-3 w-3" />
-              <span>{copy.centerOnStar}</span>
+              {copy.centerOnStar}
             </button>
             <button
               type="button"
               onClick={() => onSyncToQuery(selectedObject)}
-              className="flex items-center justify-center gap-1 rounded-md border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-elevated)] px-2 py-1.5 text-[11px] font-medium text-[var(--ae-text-primary)] transition hover:border-cyan-400/50 hover:text-cyan-200"
+              className="rounded-[var(--ae-radius-sm)] border border-[var(--ae-border-strong)] bg-[var(--ae-bg-elevated)] px-2.5 py-1.5 text-[length:var(--ae-text-sm)] font-medium text-[var(--ae-text-primary)] transition hover:bg-[var(--ae-bg-hover)]"
             >
-              <Layers className="h-3 w-3" />
-              <span>{copy.syncTo2D3D}</span>
+              {copy.syncTo2D3D}
             </button>
           </div>
         </div>
-      ) : (
-        <p className="mb-2.5 text-[11px] leading-relaxed text-[var(--ae-text-muted)]">
-          {copy.inspectorEmptyHint}
-        </p>
       )}
 
       {/* Quick SPHEREx Featured Targets */}
-      <div className="mt-2.5">
-        <div className="mb-1.5 text-[10px] font-medium text-[var(--ae-text-muted)] uppercase">
+      <div>
+        <div className="mb-2 text-[length:var(--ae-text-sm)] font-medium text-[var(--ae-text-muted)]">
           {copy.featuredTargetsTitle}
         </div>
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap gap-1.5">
           {SPHEREX_3D_TARGETS.map((target) => {
             const isSelected = selectedObject?.id === target.id;
             return (
@@ -164,10 +145,10 @@ export function SkyObjectInspector({
                 key={target.id}
                 type="button"
                 onClick={() => onSelectTarget(target)}
-                className={`rounded-full border px-2 py-0.5 text-[10px] font-medium transition ${
+                className={`rounded-[var(--ae-radius-sm)] border px-2.5 py-1 text-[length:var(--ae-text-sm)] font-medium transition ${
                   isSelected
-                    ? "border-cyan-400/60 bg-cyan-500/20 text-cyan-200"
-                    : "border-[var(--ae-border-subtle)] bg-[var(--ae-bg-elevated)] text-[var(--ae-text-secondary)] hover:border-cyan-400/40 hover:text-cyan-200"
+                    ? "border-[var(--ae-accent-primary)] bg-[var(--ae-accent-primary)] text-[var(--ae-accent-primary-content)]"
+                    : "border-[var(--ae-border-subtle)] bg-[var(--ae-bg-elevated)] text-[var(--ae-text-secondary)] hover:border-[var(--ae-border-strong)] hover:bg-[var(--ae-bg-hover)] hover:text-[var(--ae-text-primary)]"
                 }`}
               >
                 {target.name}

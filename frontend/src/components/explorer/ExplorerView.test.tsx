@@ -246,12 +246,18 @@ describe("ExplorerView", () => {
     expect(screen.queryByTestId("explorer-3d-canvas")).not.toBeInTheDocument();
   });
 
-  it("inspects a celestial target in the right sidebar and syncs coordinates between 2D and 3D", () => {
+  it("inspects a celestial target in the 3D right sidebar and syncs coordinates with 2D", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(null, { status: 404 })
     );
 
     render(<ExplorerView query={SAMPLE_QUERY} onBackToPortal={vi.fn()} />);
+
+    expect(
+      screen.queryByTestId("sky-object-inspector")
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "3D" }));
 
     const inspector = screen.getByTestId("sky-object-inspector");
     fireEvent.click(
@@ -259,7 +265,6 @@ describe("ExplorerView", () => {
     );
 
     expect(screen.getByTestId("inspector-selected-object")).toBeInTheDocument();
-    expect(screen.getByTestId("explorer-3d-canvas")).toBeInTheDocument();
 
     fireEvent.click(
       within(inspector).getByRole("button", { name: "Load in 2D & 3D" })
@@ -273,36 +278,9 @@ describe("ExplorerView", () => {
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "2D" }));
-    expect(screen.getByTestId("inspector-selected-object")).toBeInTheDocument();
-  });
-
-  it("inspects a celestial target in the right sidebar and syncs coordinates between 2D and 3D", () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(null, { status: 404 })
-    );
-
-    render(<ExplorerView query={SAMPLE_QUERY} onBackToPortal={vi.fn()} />);
-
-    const inspector = screen.getByTestId("sky-object-inspector");
-    fireEvent.click(
-      within(inspector).getByRole("button", { name: "WISE 0855" })
-    );
-
-    expect(screen.getByTestId("inspector-selected-object")).toBeInTheDocument();
-    expect(screen.getByTestId("explorer-3d-canvas")).toBeInTheDocument();
-
-    fireEvent.click(
-      within(inspector).getByRole("button", { name: "Load in 2D & 3D" })
-    );
-
     expect(
-      within(inspector).getByText("RA: 08h 55m 10.831s")
-    ).toBeInTheDocument();
-    expect(
-      within(inspector).getByText("Dec: -07° 14' 42.53\"")
-    ).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "2D" }));
-    expect(screen.getByTestId("inspector-selected-object")).toBeInTheDocument();
+      screen.queryByTestId("sky-object-inspector")
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByText(/08h 55m 10\.831s/).length).toBeGreaterThan(0);
   });
 });
