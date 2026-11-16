@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  BAND_CHANNELS,
   DEFAULT_EXPLORER_FRAMES,
   DEFAULT_EXPLORER_LAYERS,
   EXPLORER_CONFIG,
+  type BandChannelOption,
 } from "../../config/explorer";
 import { fetchExplorerFrames } from "../../services/framesService";
 import { fetchCoordinateMetadata } from "../../services/metadataService";
@@ -13,7 +15,6 @@ import type {
   ExplorerLocale,
   ExplorerSnapshot,
   ExplorerToolId,
-  LayerFilterId,
   TimelineFilterTab,
 } from "../../types/explorer";
 import type { QueryParams } from "../../types/portal";
@@ -23,7 +24,6 @@ import { ExplorerTimeline } from "./ExplorerTimeline";
 import { ExplorerToolbar } from "./ExplorerToolbar";
 import { ExplorerTopBar } from "./ExplorerTopBar";
 import { LayersInspector } from "./LayersInspector";
-import { MobileLayersDrawer } from "./MobileLayersDrawer";
 
 interface ExplorerViewProps {
   query: QueryParams;
@@ -31,10 +31,7 @@ interface ExplorerViewProps {
 }
 
 function cloneLayers(layers: ExplorerLayer[]): ExplorerLayer[] {
-  return layers.map((layer) => ({
-    ...layer,
-    filters: { ...layer.filters },
-  }));
+  return layers.map((layer) => ({ ...layer, bands: [...layer.bands] }));
 }
 
 function getInitialFrameId(frames: readonly ExplorerFrame[]): string | null {
@@ -42,11 +39,54 @@ function getInitialFrameId(frames: readonly ExplorerFrame[]): string | null {
   return preferred?.id ?? frames[EXPLORER_CONFIG.firstIndex]?.id ?? null;
 }
 
+function channelsFromFrames(
+  frames: readonly ExplorerFrame[]
+): BandChannelOption[] {
+  const seen = new Set<BandChannelId>();
+  return frames.reduce<BandChannelOption[]>((channels, frame) => {
+    const detector = frame.detector ?? frame.band;
+    if (seen.has(detector)) {
+      return channels;
+    }
+    seen.add(detector);
+    const fallback = BAND_CHANNELS.find((channel) => channel.id === detector);
+    const min = frame.wavelengthMinUm?.toFixed(2);
+    const max = frame.wavelengthMaxUm?.toFixed(2);
+    channels.push({
+      id: detector,
+      label:
+        min && max
+          ? `Detector ${detector} (${min} – ${max} µm)`
+          : fallback?.label ?? `Detector ${detector}`,
+    });
+    return channels;
+  }, []);
+}
+
+function restrictLayers(
+  layers: ExplorerLayer[],
+  availableChannels: readonly BandChannelOption[]
+): ExplorerLayer[] {
+  if (availableChannels.length === 0) {
+    return layers;
+  }
+  const available = new Set(availableChannels.map((channel) => channel.id));
+  const firstDetector = availableChannels[EXPLORER_CONFIG.firstIndex].id;
+  return layers.map((layer) => {
+    const bands = layer.bands.filter((band) => available.has(band));
+    const selectedBands =
+      bands.length > 0 ? bands : [firstDetector];
+    return { ...layer, bands: selectedBands, band: selectedBands[0] };
+  });
+}
+
 export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
   const [locale, setLocale] = useState<ExplorerLocale>("en");
   const [layers, setLayers] = useState<ExplorerLayer[]>(() =>
     cloneLayers([...DEFAULT_EXPLORER_LAYERS])
   );
+  const [availableChannels, setAvailableChannels] =
+    useState<BandChannelOption[]>(() => [...BAND_CHANNELS]);
   const [activeLayerId, setActiveLayerId] = useState<string>(
     DEFAULT_EXPLORER_LAYERS[EXPLORER_CONFIG.firstIndex]?.id ?? ""
   );
@@ -67,7 +107,6 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
   const [timelineTab, setTimelineTab] = useState<TimelineFilterTab>("all");
   const [bandFilter, setBandFilter] = useState<BandChannelId | "all">("all");
   const [isPlaying, setIsPlaying] = useState(false);
-  const [mobileLayersOpen, setMobileLayersOpen] = useState(false);
   const [docsOpen, setDocsOpen] = useState(false);
 
   useEffect(() => {
@@ -78,6 +117,17 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
     ]).then(([metadata, remoteFrames]) => {
       if (controller.signal.aborted) {
         return;
+      }
+
+      if (remoteFrames.length > EXPLORER_CONFIG.firstIndex) {
+        const detectedChannels = channelsFromFrames(remoteFrames);
+        setAvailableChannels(detectedChannels);
+        setLayers((previous) =>
+          restrictLayers(previous, detectedChannels).map((layer) => ({
+            ...layer,
+            bands: [...layer.bands],
+          }))
+        );
       }
 
       if (
@@ -95,7 +145,7 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
             return {
               id: `date-${obsDate}`,
               timestamp: obsDate,
-              band: "IR",
+              band: 2,
               filtered: false,
               visible: true,
               imageUrl: `${EXPLORER_CONFIG.framesEndpoint}/image?${imgParams.toString()}`,
@@ -206,39 +256,22 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
     pushSnapshot(next, activeLayerId);
   };
 
-  const handleToggleLayerFilter = (id: string, filterId: LayerFilterId) => {
-    const next = layers.map((layer) =>
-      layer.id === id
-        ? {
-            ...layer,
-            filters: {
-              ...layer.filters,
-              [filterId]: !layer.filters[filterId],
-            },
-          }
-        : layer
-    );
-    pushSnapshot(next, activeLayerId);
-  };
-
   const handleAddLayer = () => {
     const nextIndex = layers.length + EXPLORER_CONFIG.indexStep;
     const newId = `frm-custom-${nextIndex}`;
     const newLayer: ExplorerLayer = {
       id: newId,
       code: `FRM-0${nextIndex}`,
-      band: "Ha",
+      band: 1,
       blendMode: "Normal",
       opacity: EXPLORER_CONFIG.defaultNewLayerOpacity,
       visible: true,
-      tint: "Cyan",
-      filters: {
-        stretch: false,
-        contrast: false,
-        invert: false,
-        edges: false,
-      },
+      tint: "magma",
+      bands: [1],
     };
+    const detector = availableChannels[EXPLORER_CONFIG.firstIndex]?.id ?? 1;
+    newLayer.band = detector;
+    newLayer.bands = [detector];
     pushSnapshot([newLayer, ...layers], newId);
   };
 
@@ -251,17 +284,12 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
     const mergedLayer: ExplorerLayer = {
       id: mergedId,
       code: "MERGED",
-      band: visibleLayers[EXPLORER_CONFIG.firstIndex]?.band ?? "BB",
+      band: visibleLayers[EXPLORER_CONFIG.firstIndex]?.band ?? 1,
+      bands: visibleLayers.flatMap((layer) => layer.bands),
       blendMode: "Normal",
       opacity: EXPLORER_CONFIG.opacityMax,
       visible: true,
-      tint: "White",
-      filters: {
-        stretch: false,
-        contrast: false,
-        invert: false,
-        edges: false,
-      },
+      tint: "grey",
     };
     const hiddenLayers = layers.filter((layer) => !layer.visible);
     pushSnapshot([mergedLayer, ...hiddenLayers], mergedId);
@@ -328,7 +356,6 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
       <ExplorerTopBar
         query={query}
         locale={locale}
-        layerCount={layers.length}
         canUndo={undoStack.length > EXPLORER_CONFIG.firstIndex}
         canRedo={redoStack.length > EXPLORER_CONFIG.firstIndex}
         onBackToPortal={onBackToPortal}
@@ -339,7 +366,6 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
         onToggleLocale={() =>
           setLocale((prev) => (prev === "en" ? "es" : "en"))
         }
-        onOpenMobileLayers={() => setMobileLayersOpen(true)}
       />
 
       <div className="flex min-h-0 flex-1">
@@ -365,13 +391,13 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
         >
           <LayersInspector
             layers={layers}
+            availableChannels={availableChannels}
             activeLayerId={activeLayerId}
             locale={locale}
             onSelectLayer={setActiveLayerId}
             onToggleLayerVisibility={handleToggleLayerVisibility}
             onAddLayer={handleAddLayer}
             onUpdateLayer={handleUpdateLayer}
-            onToggleLayerFilter={handleToggleLayerFilter}
             onMergeVisible={handleMergeVisible}
           />
         </aside>
@@ -379,6 +405,7 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
 
       <ExplorerTimeline
         frames={frames}
+        availableChannels={availableChannels}
         activeFrameId={activeFrameId}
         timelineTab={timelineTab}
         bandFilter={bandFilter}
@@ -390,20 +417,6 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
         onTogglePlay={() => setIsPlaying((prev) => !prev)}
         onStepBack={handleStepBack}
         onStepForward={handleStepForward}
-      />
-
-      <MobileLayersDrawer
-        open={mobileLayersOpen}
-        layers={layers}
-        activeLayerId={activeLayerId}
-        locale={locale}
-        onClose={() => setMobileLayersOpen(false)}
-        onSelectLayer={setActiveLayerId}
-        onToggleLayerVisibility={handleToggleLayerVisibility}
-        onAddLayer={handleAddLayer}
-        onUpdateLayer={handleUpdateLayer}
-        onToggleLayerFilter={handleToggleLayerFilter}
-        onMergeVisible={handleMergeVisible}
       />
 
       <DocsModal open={docsOpen} onClose={() => setDocsOpen(false)} />

@@ -6,6 +6,8 @@ from datetime import date
 import astropy.units as u
 from astropy.coordinates import Angle
 
+VALID_RENDER_COLORS = ("grey", "viridis", "magma", "inferno", "cividis", "cubehelix")
+VALID_RENDER_BANDS = tuple(range(1, 7))
 
 class QueryValidationError(ValueError):
     pass
@@ -23,6 +25,9 @@ class SkyImageQuery:
     dec_deg: float
     observation_date: date
     field_size_deg: float = 0.05
+    color: str = "magma"
+    bands: tuple[int, ...] = ()
+    detectors: tuple[int, ...] = ()
 
 
 def _required(args: Mapping[str, str], name: str) -> str:
@@ -83,4 +88,33 @@ def parse_sky_image_query(args: Mapping[str, str]) -> SkyImageQuery:
         ) from None
 
     field_size_deg = parse_field_size_deg(args)
-    return SkyImageQuery(coords.ra_deg, coords.dec_deg, observation_date, field_size_deg)
+    color = (args.get("color") or "magma").strip()
+    if color not in VALID_RENDER_COLORS:
+        raise QueryValidationError(
+            f"'color' must be one of: {', '.join(VALID_RENDER_COLORS)}."
+        )
+
+    raw_detectors = (args.get("detectors") or args.get("detector") or "").strip()
+    raw_bands = (raw_detectors or args.get("bands") or "").strip()
+    if raw_bands:
+        try:
+            bands = tuple(int(value.strip()) for value in raw_bands.split(","))
+        except ValueError:
+            raise QueryValidationError("'detectors' must be a comma-separated list of integers.") from None
+        if not bands or any(band not in VALID_RENDER_BANDS for band in bands):
+            raise QueryValidationError("'detectors' must contain values from 1 to 6.")
+        if len(set(bands)) != len(bands):
+            raise QueryValidationError("'detectors' must not contain duplicate values.")
+    else:
+        bands = ()
+    detectors = bands if raw_detectors else ()
+
+    return SkyImageQuery(
+        coords.ra_deg,
+        coords.dec_deg,
+        observation_date,
+        field_size_deg,
+        color,
+        bands,
+        detectors,
+    )

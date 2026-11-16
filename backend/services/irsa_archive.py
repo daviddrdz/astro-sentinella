@@ -7,7 +7,7 @@ from typing import TypeVar
 from astropy.table import Table
 from pyvo.dal import DALQueryError, DALServiceError, SIA2Service
 
-SIA_URL = "https://irsa.ipac.caltech.edu/SIA"
+SIA_URL = "https://irsa.ipac.caltech.edu/SIA?"
 COLLECTION = "spherex_dr1"
 SEARCH_RADIUS_DEG = 0.01
 MAX_RETRIES = 3

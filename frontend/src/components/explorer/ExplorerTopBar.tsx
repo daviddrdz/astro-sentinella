@@ -3,7 +3,6 @@ import {
   ArrowLeft,
   BookOpen,
   GitMerge,
-  Layers,
   Menu,
   Redo2,
   Telescope,
@@ -17,7 +16,6 @@ import type { QueryParams } from "../../types/portal";
 interface ExplorerTopBarProps {
   query: QueryParams;
   locale: ExplorerLocale;
-  layerCount: number;
   canUndo: boolean;
   canRedo: boolean;
   onBackToPortal: () => void;
@@ -26,7 +24,6 @@ interface ExplorerTopBarProps {
   onMergeExport: () => void;
   onOpenDocs: () => void;
   onToggleLocale: () => void;
-  onOpenMobileLayers: () => void;
 }
 
 function formatFieldSizeArcmin(fieldSizeDeg: string): string {
@@ -41,7 +38,6 @@ function formatFieldSizeArcmin(fieldSizeDeg: string): string {
 export function ExplorerTopBar({
   query,
   locale,
-  layerCount,
   canUndo,
   canRedo,
   onBackToPortal,
@@ -50,7 +46,6 @@ export function ExplorerTopBar({
   onMergeExport,
   onOpenDocs,
   onToggleLocale,
-  onOpenMobileLayers,
 }: ExplorerTopBarProps) {
   const copy = EXPLORER_COPY[locale];
   const arcminLabel = formatFieldSizeArcmin(query.fieldSizeDeg);
@@ -174,15 +169,6 @@ export function ExplorerTopBar({
 
       {/* Mobile actions */}
       <div className="flex items-center gap-1.5 md:hidden">
-        <button
-          type="button"
-          onClick={onOpenMobileLayers}
-          className="btn btn-sm gap-1.5 border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-elevated)] text-[var(--ae-text-primary)]"
-        >
-          <Layers size={EXPLORER_CONFIG.iconSizeSm} aria-hidden="true" />
-          <span>{`${copy.layers} (${layerCount})`}</span>
-        </button>
-
         <div className="dropdown dropdown-end">
           <button
             type="button"

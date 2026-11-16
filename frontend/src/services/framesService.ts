@@ -1,14 +1,10 @@
-import { EXPLORER_CONFIG } from "../config/explorer";
+import { BAND_CHANNELS, EXPLORER_CONFIG } from "../config/explorer";
 import type { BandChannelId, ExplorerFrame } from "../types/explorer";
 import type { QueryParams } from "../types/portal";
 
-const VALID_BANDS: ReadonlySet<BandChannelId> = new Set([
-  "Ha",
-  "OIII",
-  "IR",
-  "UV",
-  "BB",
-]);
+const VALID_BANDS: ReadonlySet<BandChannelId> = new Set(
+  BAND_CHANNELS.map((channel) => channel.id)
+);
 
 function isValidFrame(item: unknown): item is ExplorerFrame {
   if (typeof item !== "object" || item === null) {
@@ -18,7 +14,8 @@ function isValidFrame(item: unknown): item is ExplorerFrame {
   return (
     typeof candidate.id === "string" &&
     typeof candidate.timestamp === "string" &&
-    typeof candidate.band === "string" &&
+    typeof candidate.band === "number" &&
+    Number.isInteger(candidate.band) &&
     VALID_BANDS.has(candidate.band as BandChannelId) &&
     typeof candidate.filtered === "boolean" &&
     typeof candidate.visible === "boolean"

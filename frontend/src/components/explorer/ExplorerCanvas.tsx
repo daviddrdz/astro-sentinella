@@ -1,10 +1,6 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, Loader2, RotateCw } from "lucide-react";
-import {
-  CHANNEL_TINTS,
-  EXPLORER_CONFIG,
-  EXPLORER_COPY,
-} from "../../config/explorer";
+import { EXPLORER_CONFIG, EXPLORER_COPY } from "../../config/explorer";
 import type {
   ExplorerFrame,
   ExplorerLayer,
@@ -29,28 +25,6 @@ type ImageSourceCarrier = {
   src?: string;
 };
 
-function getTintHex(tintId: ExplorerLayer["tint"]): string {
-  const match = CHANNEL_TINTS.find((item) => item.id === tintId);
-  return match ? match.hex : "#4BA39B";
-}
-
-function buildFilterCss(layer: ExplorerLayer): string {
-  const parts: string[] = [];
-  if (layer.filters.stretch) {
-    parts.push("brightness(1.18)");
-  }
-  if (layer.filters.contrast) {
-    parts.push("contrast(1.35)");
-  }
-  if (layer.filters.invert) {
-    parts.push("invert(0.85)");
-  }
-  if (layer.filters.edges) {
-    parts.push("saturate(1.5) contrast(1.2)");
-  }
-  return parts.length > EXPLORER_CONFIG.firstIndex ? parts.join(" ") : "none";
-}
-
 function mapBlendMode(
   blendMode: ExplorerLayer["blendMode"]
 ): "normal" | "difference" | "screen" | "lighten" {
@@ -74,15 +48,21 @@ function resolveLayerImageUrl(
   const frameSource = activeFrame as
     (ExplorerFrame & ImageSourceCarrier) | null;
 
-  return (
+  const imageUrl =
     layerSource.imageUrl ??
     layerSource.url ??
     layerSource.src ??
     frameSource?.imageUrl ??
     frameSource?.url ??
     frameSource?.src ??
-    null
-  );
+    null;
+  if (!imageUrl) {
+    return null;
+  }
+  const url = new URL(imageUrl, window.location.origin);
+  url.searchParams.set("color", layer.tint);
+  url.searchParams.set("bands", layer.bands.join(","));
+  return `${url.pathname}${url.search}`;
 }
 
 export function ExplorerCanvas({
@@ -110,7 +90,10 @@ export function ExplorerCanvas({
     EXPLORER_CONFIG.progressInitialPct
   );
 
-  const primaryUrl = activeFrame?.imageUrl ?? null;
+  const primaryUrl =
+    visibleLayers.length > EXPLORER_CONFIG.firstIndex
+      ? resolveLayerImageUrl(visibleLayers[EXPLORER_CONFIG.firstIndex], activeFrame)
+      : null;
   const primaryRetry = primaryUrl
     ? (retryCountByUrl[primaryUrl] ?? EXPLORER_CONFIG.firstIndex)
     : EXPLORER_CONFIG.firstIndex;
@@ -172,7 +155,6 @@ export function ExplorerCanvas({
         style={{ transform: `scale(${zoomLevel})` }}
       >
         {visibleLayers.map((layer) => {
-          const tintHex = getTintHex(layer.tint);
           const opacityValue = layer.opacity / EXPLORER_CONFIG.opacityMax;
           const imageUrl = resolveLayerImageUrl(layer, activeFrame);
 
@@ -184,7 +166,6 @@ export function ExplorerCanvas({
               style={{
                 opacity: opacityValue,
                 mixBlendMode: mapBlendMode(layer.blendMode),
-                filter: buildFilterCss(layer),
               }}
             >
               {imageUrl ? (
@@ -222,24 +203,14 @@ export function ExplorerCanvas({
                       />
                     );
                   })()}
-                  {/* Channel tint overlay preserving dark sky background */}
-                  {layer.tint !== "White" && (
-                    <div
-                      aria-hidden="true"
-                      className="absolute inset-0"
-                      style={{
-                        backgroundColor: tintHex,
-                        mixBlendMode: "multiply",
-                      }}
-                    />
-                  )}
                 </div>
               ) : (
                 <div
                   aria-hidden="true"
                   className="h-full w-full"
                   style={{
-                    background: `radial-gradient(circle at 48% 50%, ${tintHex}44 0%, ${tintHex}18 32%, transparent 68%)`,
+                    background:
+                      "radial-gradient(circle at 48% 50%, #4ba39b44 0%, #4ba39b18 32%, transparent 68%)",
                   }}
                 />
               )}

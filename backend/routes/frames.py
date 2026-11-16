@@ -41,19 +41,18 @@ def frame_image():
         return error_response(400, "invalid_request", str(exc))
 
     try:
+        options = {}
         if "fieldSizeDeg" in request.args:
-            png_bytes = get_sky_image_png(
-                query.ra_deg,
-                query.dec_deg,
-                query.observation_date,
-                query.field_size_deg,
-            )
-        else:
-            png_bytes = get_sky_image_png(
-                query.ra_deg,
-                query.dec_deg,
-                query.observation_date,
-            )
+            options["size_deg"] = query.field_size_deg
+        if "color" in request.args:
+            options["color"] = query.color
+        if "bands" in request.args:
+            options["bands"] = query.bands or None
+        if query.detectors:
+            options["detectors"] = query.detectors
+        png_bytes = get_sky_image_png(
+            query.ra_deg, query.dec_deg, query.observation_date, **options
+        )
     except ImageNotFoundError as exc:
         return error_response(404, "image_not_found", str(exc))
     except ArchiveUnavailableError:

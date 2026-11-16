@@ -6,7 +6,6 @@ import type {
   ExplorerLayer,
   ExplorerLocale,
   ExplorerToolId,
-  LayerFilterId,
   TimelineFilterTab,
 } from "../types/explorer";
 
@@ -73,37 +72,26 @@ export interface BandChannelOption {
 }
 
 export const BAND_CHANNELS: readonly BandChannelOption[] = [
-  { id: "Ha", label: "H-alpha 656nm" },
-  { id: "OIII", label: "OIII 501nm" },
-  { id: "IR", label: "Infrared 850nm" },
-  { id: "UV", label: "Ultraviolet 280nm" },
-  { id: "BB", label: "Broadband RGB" },
+  { id: 1, label: "Detector 1 (0.75 – 1.11 µm)" },
+  { id: 2, label: "Detector 2 (1.11 – 1.66 µm)" },
+  { id: 3, label: "Detector 3 (1.64 – 2.42 µm)" },
+  { id: 4, label: "Detector 4 (2.42 – 3.18 µm)" },
+  { id: 5, label: "Detector 5 (3.18 – 4.41 µm)" },
+  { id: 6, label: "Detector 6 (4.41 – 5.00 µm)" },
 ];
 
 export interface ChannelTintOption {
   id: ChannelTintId;
-  label: Record<ExplorerLocale, string>;
-  hex: string;
+  label: string;
 }
 
 export const CHANNEL_TINTS: readonly ChannelTintOption[] = [
-  { id: "Cyan", label: { en: "Cyan", es: "Cian" }, hex: "#4BA39B" },
-  { id: "Amber", label: { en: "Amber", es: "Ámbar" }, hex: "#FBBF24" },
-  { id: "Violet", label: { en: "Violet", es: "Violeta" }, hex: "#8B5CF6" },
-  { id: "Emerald", label: { en: "Emerald", es: "Esmeralda" }, hex: "#34D399" },
-  { id: "White", label: { en: "White", es: "Blanco" }, hex: "#E6ECF5" },
-];
-
-export interface LayerFilterOption {
-  id: LayerFilterId;
-  label: Record<ExplorerLocale, string>;
-}
-
-export const LAYER_FILTERS: readonly LayerFilterOption[] = [
-  { id: "stretch", label: { en: "Stretch", es: "Estirar" } },
-  { id: "contrast", label: { en: "Contrast", es: "Contraste" } },
-  { id: "invert", label: { en: "Invert", es: "Invertir" } },
-  { id: "edges", label: { en: "Edges", es: "Bordes" } },
+  { id: "grey", label: "grey" },
+  { id: "viridis", label: "viridis" },
+  { id: "magma", label: "magma" },
+  { id: "inferno", label: "inferno" },
+  { id: "cividis", label: "cividis" },
+  { id: "cubehelix", label: "cubehelix" },
 ];
 
 export interface TimelineTabOption {
@@ -130,7 +118,6 @@ export const EXPLORER_COPY: Record<
     bandChannel: string;
     channelTint: string;
     opacity: string;
-    filters: string;
     mergeVisible: string;
     timeline: string;
     bandAll: string;
@@ -161,7 +148,6 @@ export const EXPLORER_COPY: Record<
     bandChannel: "Band / Channel",
     channelTint: "Channel Tint",
     opacity: "Opacity",
-    filters: "Filters",
     mergeVisible: "Merge Visible",
     timeline: "Timeline",
     bandAll: "Band: All",
@@ -192,7 +178,6 @@ export const EXPLORER_COPY: Record<
     bandChannel: "Banda / Canal",
     channelTint: "Tinte de canal",
     opacity: "Opacidad",
-    filters: "Filtros",
     mergeVisible: "Combinar visibles",
     timeline: "Línea de tiempo",
     bandAll: "Banda: Todas",
@@ -216,44 +201,24 @@ export const EXPLORER_COPY: Record<
 
 export const DEFAULT_EXPLORER_LAYERS: readonly ExplorerLayer[] = [
   {
-    id: "frm-04",
-    code: "FRM-04",
-    band: "Ha",
-    blendMode: "Normal",
-    opacity: 100,
-    visible: true,
-    tint: "White",
-    filters: { stretch: false, contrast: false, invert: false, edges: false },
-  },
-  {
-    id: "frm-03",
-    code: "FRM-03",
-    band: "OIII",
-    blendMode: "Screen",
-    opacity: 100,
-    visible: false,
-    tint: "Emerald",
-    filters: { stretch: false, contrast: false, invert: false, edges: false },
-  },
-  {
     id: "frm-02",
     code: "FRM-02",
-    band: "IR",
+    band: 2,
+    bands: [2],
     blendMode: "Normal",
     opacity: 70,
-    visible: false,
-    tint: "Amber",
-    filters: { stretch: false, contrast: true, invert: false, edges: false },
+    visible: true,
+    tint: "magma",
   },
   {
     id: "frm-01",
     code: "FRM-01",
-    band: "UV",
+    band: 1,
+    bands: [1],
     blendMode: "Normal",
     opacity: 0,
     visible: false,
-    tint: "Violet",
-    filters: { stretch: false, contrast: false, invert: false, edges: false },
+    tint: "grey",
   },
 ];
 
@@ -261,56 +226,56 @@ export const DEFAULT_EXPLORER_FRAMES: readonly ExplorerFrame[] = [
   {
     id: "f-1810",
     timestamp: "18:10Z",
-    band: "UV",
+    band: 1,
     filtered: false,
     visible: false,
   },
   {
     id: "f-1820",
     timestamp: "18:20Z",
-    band: "IR",
+    band: 2,
     filtered: false,
     visible: true,
   },
   {
     id: "f-1830",
     timestamp: "18:30Z",
-    band: "OIII",
+    band: 3,
     filtered: false,
     visible: true,
   },
   {
     id: "f-1840",
     timestamp: "18:40Z",
-    band: "Ha",
+    band: 1,
     filtered: false,
     visible: true,
   },
   {
     id: "f-1850",
     timestamp: "18:50Z",
-    band: "Ha",
+    band: 1,
     filtered: true,
     visible: true,
   },
   {
     id: "f-1900",
     timestamp: "19:00Z",
-    band: "OIII",
+    band: 3,
     filtered: false,
     visible: true,
   },
   {
     id: "f-1910",
     timestamp: "19:10Z",
-    band: "IR",
+    band: 2,
     filtered: false,
     visible: true,
   },
   {
     id: "f-1920",
     timestamp: "19:20Z",
-    band: "BB",
+    band: 6,
     filtered: false,
     visible: true,
   },
