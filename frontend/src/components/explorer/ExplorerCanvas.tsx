@@ -6,7 +6,6 @@ import {
   SPECTRUM_CHART,
 } from "../../config/explorer";
 import type {
-  ChannelTintId,
   ChunkBounds,
   ExplorerFrame,
   ExplorerLayer,
@@ -42,17 +41,8 @@ type ImageSourceCarrier = {
   src?: string;
 };
 
-const TINT_HEX: Record<ChannelTintId, string> = {
-  grey: "#94A3B8",
-  viridis: "#21918C",
-  magma: "#B5367A",
-  inferno: "#F98E09",
-  cividis: "#7C8770",
-  cubehelix: "#6890C8",
-};
-
-function getTintHex(tintId: ExplorerLayer["tint"]): string {
-  return TINT_HEX[tintId] ?? "#4BA39B";
+function withColor(imageUrl: string, color: ExplorerLayer["tint"]): string {
+  return `${imageUrl}${imageUrl.includes("?") ? "&" : "?"}color=${encodeURIComponent(color)}`;
 }
 
 function buildFilterCss(): string {
@@ -163,7 +153,10 @@ export function ExplorerCanvas({
     return () => observer.disconnect();
   }, []);
 
-  const primaryUrl = activeFrame?.imageUrl ?? null;
+  const primarySourceUrl = activeFrame?.imageUrl ?? null;
+  const primaryUrl = primarySourceUrl
+    ? withColor(primarySourceUrl, visibleLayers[0]?.tint ?? "magma")
+    : null;
   const primaryRetry = primaryUrl
     ? (retryCountByUrl[primaryUrl] ?? EXPLORER_CONFIG.firstIndex)
     : EXPLORER_CONFIG.firstIndex;
@@ -371,9 +364,11 @@ export function ExplorerCanvas({
           </div>
         ) : (
           visibleLayers.map((layer) => {
-            const tintHex = getTintHex(layer.tint);
             const opacityValue = layer.opacity / EXPLORER_CONFIG.opacityMax;
-            const imageUrl = resolveLayerImageUrl(layer, activeFrame);
+            const sourceImageUrl = resolveLayerImageUrl(layer, activeFrame);
+            const imageUrl = sourceImageUrl
+              ? withColor(sourceImageUrl, layer.tint)
+              : null;
 
             return (
               <div
@@ -414,12 +409,18 @@ export function ExplorerCanvas({
                             setStatusByUrl((prev) => ({
                               ...prev,
                               [cacheKey]: "loaded",
+                              ...(imageUrl === primaryUrl && primaryKey
+                                ? { [primaryKey]: "loaded" as const }
+                                : {}),
                             }));
                           }}
                           onError={() => {
                             setStatusByUrl((prev) => ({
                               ...prev,
                               [cacheKey]: "error",
+                              ...(imageUrl === primaryUrl && primaryKey
+                                ? { [primaryKey]: "error" as const }
+                                : {}),
                             }));
                           }}
                           className={`h-full w-full object-contain transition-opacity duration-200 ${
@@ -428,25 +429,11 @@ export function ExplorerCanvas({
                         />
                       );
                     })()}
-                    {/* Channel tint overlay preserving dark sky background */}
-                    {layer.tint !== "grey" && (
-                      <div
-                        aria-hidden="true"
-                        className="absolute inset-0"
-                        style={{
-                          backgroundColor: tintHex,
-                          mixBlendMode: "multiply",
-                        }}
-                      />
-                    )}
                   </div>
                 ) : (
                   <div
                     aria-hidden="true"
                     className="h-full w-full"
-                    style={{
-                      background: `radial-gradient(circle at 48% 50%, ${tintHex}44 0%, ${tintHex}18 32%, transparent 68%)`,
-                    }}
                   />
                 )}
               </div>
