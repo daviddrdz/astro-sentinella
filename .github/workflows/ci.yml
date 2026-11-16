@@ -31,7 +31,7 @@ jobs:
       - run: pnpm run build
 
   backend:
-    name: Backend (Install & Syntax Check)
+    name: Backend (Install, Unit Tests & Syntax Check)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -45,3 +45,4 @@ jobs:
           cache-dependency-path: backend/requirements.txt
       - run: pip install -r requirements.txt
       - run: python -m py_compile app.py
+      - run: python -m pytest tests -q -rx
