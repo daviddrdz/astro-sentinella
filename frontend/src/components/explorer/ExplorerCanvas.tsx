@@ -132,6 +132,12 @@ export function ExplorerCanvas({
 }: ExplorerCanvasProps) {
   const copy = EXPLORER_COPY[locale];
   const visibleLayers = layers.filter((layer) => layer.visible);
+  const primaryLayer = visibleLayers[0] ?? layers[0];
+  const primaryTint = primaryLayer?.tint ?? "grey";
+  const primaryTintHex = getTintHex(primaryTint);
+  const primaryOpacity = primaryLayer
+    ? primaryLayer.opacity / EXPLORER_CONFIG.opacityMax
+    : 1;
   const scaleArcmin = (EXPLORER_CONFIG.defaultScaleArcmin / zoomLevel).toFixed(
     EXPLORER_CONFIG.firstIndex
   );
@@ -401,7 +407,7 @@ export function ExplorerCanvas({
       {/* Stacked photogram layers or Compare subtraction view */}
       <div
         ref={frameRef}
-        className={`relative h-[78%] w-[86%] max-w-3xl bg-[var(--ae-bg-canvas)] ${
+        className={`relative aspect-square h-[78%] max-w-[86%] bg-[var(--ae-bg-canvas)] ${
           showSurroundingSectors
             ? "overflow-visible"
             : "overflow-hidden rounded-lg border border-[var(--ae-border-subtle)] shadow-2xl"
@@ -425,6 +431,7 @@ export function ExplorerCanvas({
                   style={{
                     left: `${tile.col * RULER_PCT}%`,
                     top: `${tile.row * RULER_PCT}%`,
+                    opacity: primaryOpacity,
                   }}
                   className="absolute h-full w-full overflow-hidden bg-[var(--ae-bg-canvas)]"
                 >
@@ -451,6 +458,18 @@ export function ExplorerCanvas({
                       }`}
                     />
                   )}
+                  {primaryTint !== "grey" &&
+                    tile.imageUrl &&
+                    status === "loaded" && (
+                      <div
+                        aria-hidden="true"
+                        className="absolute inset-0"
+                        style={{
+                          backgroundColor: primaryTintHex,
+                          mixBlendMode: "multiply",
+                        }}
+                      />
+                    )}
                   {isErrorOrMissing && (
                     <div
                       data-testid={`sector-warning-${tile.key}`}
@@ -603,7 +622,7 @@ export function ExplorerCanvas({
                               [cacheKey]: "error",
                             }));
                           }}
-                          className={`h-full w-full object-contain transition-opacity duration-200 ${
+                          className={`h-full w-full object-cover transition-opacity duration-200 ${
                             imgStatus === "loaded" ? "opacity-100" : "opacity-0"
                           }`}
                         />
