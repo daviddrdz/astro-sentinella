@@ -1,9 +1,6 @@
 import { X } from "lucide-react";
 import { EXPLORER_CONFIG, EXPLORER_COPY } from "../../config/explorer";
-import type {
-  ExplorerLayer,
-  ExplorerLocale,
-} from "../../types/explorer";
+import type { ExplorerLayer, ExplorerLocale } from "../../types/explorer";
 import { LayersInspector } from "./LayersInspector";
 
 interface MobileLayersDrawerProps {
