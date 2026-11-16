@@ -8,6 +8,7 @@ from astropy.coordinates import Angle
 
 VALID_RENDER_COLORS = ("grey", "viridis", "magma", "inferno", "cividis", "cubehelix")
 VALID_RENDER_BANDS = tuple(range(1, 7))
+VALID_APERTURES_PX = (1, 3, 5)
 
 class QueryValidationError(ValueError):
     pass
@@ -27,6 +28,14 @@ class SkyImageQuery:
     field_size_deg: float = 0.05
     color: str = "magma"
     bands: tuple[int, ...] = ()
+
+
+@dataclass(frozen=True)
+class SpectrumQuery:
+    ra_deg: float
+    dec_deg: float
+    aperture_px: int = 1
+    detectors: tuple[int, ...] = ()
 
 
 def _required(args: Mapping[str, str], name: str) -> str:
@@ -77,6 +86,38 @@ def parse_field_size_deg(args: Mapping[str, str], default: float = 0.05) -> floa
     return size
 
 
+def _parse_id_list(args: Mapping[str, str], name: str, valid: tuple[int, ...]) -> tuple[int, ...]:
+    raw = (args.get(name) or "").strip()
+    if not raw:
+        return ()
+    try:
+        ids = tuple(int(value.strip()) for value in raw.split(","))
+    except ValueError:
+        raise QueryValidationError(f"'{name}' must be a comma-separated list of integers.") from None
+    if not ids or any(value not in valid for value in ids):
+        raise QueryValidationError(f"'{name}' must contain values from {valid[0]} to {valid[-1]}.")
+    if len(set(ids)) != len(ids):
+        raise QueryValidationError(f"'{name}' must not contain duplicate values.")
+    return ids
+
+
+def parse_spectrum_query(args: Mapping[str, str]) -> SpectrumQuery:
+    coords = parse_coordinates(args)
+    raw_aperture = (args.get("aperturePx") or "").strip()
+    aperture_px = VALID_APERTURES_PX[0]
+    if raw_aperture:
+        try:
+            aperture_px = int(raw_aperture)
+        except ValueError:
+            raise QueryValidationError("'aperturePx' must be an integer.") from None
+        if aperture_px not in VALID_APERTURES_PX:
+            raise QueryValidationError(
+                f"'aperturePx' must be one of: {', '.join(map(str, VALID_APERTURES_PX))}."
+            )
+    detectors = _parse_id_list(args, "detectors", VALID_RENDER_BANDS)
+    return SpectrumQuery(coords.ra_deg, coords.dec_deg, aperture_px, detectors)
+
+
 def parse_sky_image_query(args: Mapping[str, str]) -> SkyImageQuery:
     coords = parse_coordinates(args)
     try:
@@ -93,18 +134,7 @@ def parse_sky_image_query(args: Mapping[str, str]) -> SkyImageQuery:
             f"'color' must be one of: {', '.join(VALID_RENDER_COLORS)}."
         )
 
-    raw_bands = (args.get("bands") or "").strip()
-    if raw_bands:
-        try:
-            bands = tuple(int(value.strip()) for value in raw_bands.split(","))
-        except ValueError:
-            raise QueryValidationError("'bands' must be a comma-separated list of integers.") from None
-        if not bands or any(band not in VALID_RENDER_BANDS for band in bands):
-            raise QueryValidationError("'bands' must contain values from 1 to 6.")
-        if len(set(bands)) != len(bands):
-            raise QueryValidationError("'bands' must not contain duplicate values.")
-    else:
-        bands = ()
+    bands = _parse_id_list(args, "bands", VALID_RENDER_BANDS)
 
     return SkyImageQuery(
         coords.ra_deg,

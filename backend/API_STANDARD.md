@@ -6,8 +6,35 @@ This document defines conventions for implementing the Flask API consumed by the
 
 - `GET /api/metadata?ra={ra}&dec={dec}` returns coordinate metadata used to populate available observation dates.
 - `GET /api/frames?ra={ra}&dec={dec}&fieldSizeDeg={degrees}&observationDate={date}` returns the frames for an explorer query.
+- `GET /api/spectrum?ra={ra}&dec={dec}[&aperturePx=1|3|5][&detectors=1,2,...]` returns the SPHEREx spectrum at a sky position, assembled from one pixel of every exposure covering it (see below).
 
 Keep these contracts aligned with the frontend types and service validation in `frontend/src/types/portal.ts`, `frontend/src/types/explorer.ts`, `frontend/src/services/metadataService.ts`, and `frontend/src/services/framesService.ts`.
+
+### Spectrum response
+
+```json
+{
+  "position": { "ra": 10.68, "dec": 41.27 },
+  "aperturePx": 1,
+  "units": { "wavelength": "um", "flux": "MJy / sr" },
+  "points": [
+    { "wavelength": 0.75, "bandwidth": 0.018, "flux": 95.2, "error": 0.38, "zodi": 0.15,
+      "detector": 1, "obsId": "2025W28_1B_0480_4", "mjd": 60865.62 }
+  ],
+  "binned": [
+    { "wavelength": 0.75, "wavelengthMin": 0.745, "wavelengthMax": 0.764, "flux": 95.2,
+      "error": 0.38, "detector": 1, "n": 1 }
+  ],
+  "coverage": { "exposures": 229, "used": 171, "outOfBounds": 1, "failed": 0, "timedOut": 57,
+                "detectors": [1, 2, 3, 4, 5, 6] },
+  "status": "complete" | "partial"
+}
+```
+
+- `points` are raw per-exposure samples sorted by wavelength, already zodiacal-light subtracted (`zodi` is the subtracted value). `flux`/`error`/`zodi`/`mjd` are `null` when unavailable.
+- `binned` is the chart series: inverse-variance weighted means in 17 log-spaced bins per detector (at most 102 bins), after 3-sigma clipping. `error` is `null` when any member lacks a variance.
+- `status` is `partial` when some exposures failed or exceeded the server deadline; the payload is still usable.
+- Errors: `400 invalid_request`, `404 no_coverage` (no exposures at the position), `502 image_source_unavailable`.
 
 ## Request Validation
 
