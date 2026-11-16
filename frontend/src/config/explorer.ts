@@ -26,7 +26,6 @@ export const EXPLORER_CONFIG = {
   defaultNewLayerOpacity: 80,
   zoomMin: 0.5,
   zoomMax: 4,
-  zoomStep: 0.25,
   zoomDefault: 1,
   dragThresholdPx: 4,
   wheelZoomSensitivity: 0.0015,
@@ -51,15 +50,11 @@ export interface ToolOption {
 
 export const EXPLORER_TOOLS: readonly ToolOption[] = [
   { id: "hand", mobileVisible: true, label: { en: "Pan", es: "Mover" } },
-  { id: "zoom", mobileVisible: true, label: { en: "Zoom", es: "Zoom" } },
-  { id: "split", mobileVisible: true, label: { en: "Split", es: "Dividir" } },
   {
     id: "subtract",
     mobileVisible: true,
     label: { en: "Subtract", es: "Restar" },
   },
-  { id: "region", mobileVisible: false, label: { en: "Region", es: "Región" } },
-  { id: "ruler", mobileVisible: false, label: { en: "Ruler", es: "Regla" } },
   {
     id: "spectrum",
     mobileVisible: true,

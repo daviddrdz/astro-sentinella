@@ -347,16 +347,6 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
     setActiveTool(tool);
   };
 
-  const handleCanvasClick = () => {
-    if (activeTool === "zoom") {
-      setZoomLevel((prev) =>
-        prev >= EXPLORER_CONFIG.zoomMax
-          ? EXPLORER_CONFIG.zoomDefault
-          : Math.min(EXPLORER_CONFIG.zoomMax, prev + EXPLORER_CONFIG.zoomStep)
-      );
-    }
-  };
-
   const handleStepBack = useCallback(() => {
     if (frames.length === EXPLORER_CONFIG.firstIndex) {
       return;
@@ -569,7 +559,6 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
           locale={locale}
           onPanChange={setPanOffset}
           onZoomChange={setZoomLevel}
-          onCanvasClick={handleCanvasClick}
           spectrumGrid={spectrumGrid}
           selectedChunk={
             spectrum.status === "loaded" ? spectrum.data.chunk.bounds : null

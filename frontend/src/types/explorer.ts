@@ -1,14 +1,6 @@
 export type ExplorerLocale = "en" | "es";
 
-export type ExplorerToolId =
-  | "hand"
-  | "zoom"
-  | "split"
-  | "subtract"
-  | "region"
-  | "ruler"
-  | "spectrum"
-  | "reset";
+export type ExplorerToolId = "hand" | "subtract" | "spectrum" | "reset";
 
 export type BlendMode = "Normal" | "Subtract" | "Screen" | "Add";
 
