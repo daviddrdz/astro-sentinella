@@ -1,13 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Loader2, RotateCw } from "lucide-react";
-import { EXPLORER_CONFIG, EXPLORER_COPY } from "../../config/explorer";
+import {
+  EXPLORER_CONFIG,
+  EXPLORER_COPY,
+  SPECTRUM_CHART,
+} from "../../config/explorer";
 import type {
+  ChunkBounds,
   ExplorerFrame,
   ExplorerLayer,
   ExplorerLocale,
   ExplorerToolId,
 } from "../../types/explorer";
 import type { QueryParams } from "../../types/portal";
+import { clamp01, containedBox, type Size } from "../../utils/spectrum";
 
 interface ExplorerCanvasProps {
   query: QueryParams;
@@ -17,6 +23,11 @@ interface ExplorerCanvasProps {
   zoomLevel: number;
   locale: ExplorerLocale;
   onCanvasClick: () => void;
+  /** Chunk grid learned from the last spectrum response (cells are invisible). */
+  spectrumGrid?: { rows: number; cols: number } | null;
+  selectedChunk?: ChunkBounds | null;
+  pendingChunkClick?: { x: number; y: number } | null;
+  onChunkSelect?: (x: number, y: number) => void;
 }
 
 type ImageSourceCarrier = {
@@ -73,6 +84,10 @@ export function ExplorerCanvas({
   zoomLevel,
   locale,
   onCanvasClick,
+  spectrumGrid = null,
+  selectedChunk = null,
+  pendingChunkClick = null,
+  onChunkSelect,
 }: ExplorerCanvasProps) {
   const copy = EXPLORER_COPY[locale];
   const visibleLayers = layers.filter((layer) => layer.visible);
@@ -89,6 +104,33 @@ export function ExplorerCanvas({
   const [loadingPct, setLoadingPct] = useState<number>(
     EXPLORER_CONFIG.progressInitialPct
   );
+  const frameRef = useRef<HTMLDivElement>(null);
+  const [frameSize, setFrameSize] = useState<Size | null>(null);
+  const [naturalSize, setNaturalSize] = useState<Size | null>(null);
+  const [hoverCell, setHoverCell] = useState<{
+    row: number;
+    col: number;
+  } | null>(null);
+
+  // Unscaled layout size of the frame box; the zoom transform is applied on top.
+  useEffect(() => {
+    const element = frameRef.current;
+    if (!element) {
+      return;
+    }
+    const measure = () =>
+      setFrameSize({
+        width: element.offsetWidth,
+        height: element.offsetHeight,
+      });
+    measure();
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
 
   const primaryUrl =
     visibleLayers.length > EXPLORER_CONFIG.firstIndex
@@ -154,6 +196,7 @@ export function ExplorerCanvas({
 
       {/* Stacked photogram layers */}
       <div
+        ref={frameRef}
         className="relative h-[78%] w-[86%] max-w-3xl overflow-hidden rounded-lg border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-canvas)] shadow-2xl transition-transform duration-200"
         style={{ transform: `scale(${zoomLevel})` }}
       >
@@ -188,7 +231,14 @@ export function ExplorerCanvas({
                         src={srcWithRetry}
                         alt={`${layer.code} astronomical cutout`}
                         draggable={false}
-                        onLoad={() => {
+                        onLoad={(event) => {
+                          const img = event.currentTarget;
+                          if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+                            setNaturalSize({
+                              width: img.naturalWidth,
+                              height: img.naturalHeight,
+                            });
+                          }
                           setStatusByUrl((prev) => ({
                             ...prev,
                             [cacheKey]: "loaded",
@@ -293,6 +343,87 @@ export function ExplorerCanvas({
             className="pointer-events-none absolute top-1/4 left-1/4 h-1/2 w-1/2 border border-dashed border-[var(--ae-warning)]/80"
           />
         )}
+        {activeTool === "spectrum" &&
+          onChunkSelect &&
+          primaryUrl &&
+          primaryStatus === "loaded" &&
+          frameSize &&
+          naturalSize && (
+            <div
+              data-testid="chunk-overlay"
+              className="absolute cursor-crosshair"
+              style={containedBox(frameSize, naturalSize)}
+              onClick={(event) => {
+                event.stopPropagation();
+                const rect = event.currentTarget.getBoundingClientRect();
+                if (rect.width <= 0 || rect.height <= 0) {
+                  return;
+                }
+                onChunkSelect(
+                  clamp01((event.clientX - rect.left) / rect.width),
+                  clamp01((event.clientY - rect.top) / rect.height)
+                );
+              }}
+              onPointerMove={(event) => {
+                if (!spectrumGrid) {
+                  return;
+                }
+                const rect = event.currentTarget.getBoundingClientRect();
+                if (rect.width <= 0 || rect.height <= 0) {
+                  return;
+                }
+                const x = clamp01((event.clientX - rect.left) / rect.width);
+                const y = clamp01((event.clientY - rect.top) / rect.height);
+                setHoverCell({
+                  row: Math.min(
+                    Math.floor(y * spectrumGrid.rows),
+                    spectrumGrid.rows - 1
+                  ),
+                  col: Math.min(
+                    Math.floor(x * spectrumGrid.cols),
+                    spectrumGrid.cols - 1
+                  ),
+                });
+              }}
+              onPointerLeave={() => setHoverCell(null)}
+            >
+              {spectrumGrid && hoverCell && (
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute border border-[var(--ae-text-primary)]/30"
+                  style={{
+                    left: `${(hoverCell.col / spectrumGrid.cols) * SPECTRUM_CHART.percent}%`,
+                    top: `${(hoverCell.row / spectrumGrid.rows) * SPECTRUM_CHART.percent}%`,
+                    width: `${SPECTRUM_CHART.percent / spectrumGrid.cols}%`,
+                    height: `${SPECTRUM_CHART.percent / spectrumGrid.rows}%`,
+                  }}
+                />
+              )}
+              {selectedChunk && (
+                <div
+                  data-testid="selected-chunk"
+                  aria-hidden="true"
+                  className="pointer-events-none absolute border-2 border-[var(--ae-accent-primary)] bg-[var(--ae-accent-primary)]/10"
+                  style={{
+                    left: `${selectedChunk.left * SPECTRUM_CHART.percent}%`,
+                    top: `${selectedChunk.top * SPECTRUM_CHART.percent}%`,
+                    width: `${selectedChunk.width * SPECTRUM_CHART.percent}%`,
+                    height: `${selectedChunk.height * SPECTRUM_CHART.percent}%`,
+                  }}
+                />
+              )}
+              {pendingChunkClick && (
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 animate-ping rounded-full bg-[var(--ae-accent-primary)]"
+                  style={{
+                    left: `${pendingChunkClick.x * SPECTRUM_CHART.percent}%`,
+                    top: `${pendingChunkClick.y * SPECTRUM_CHART.percent}%`,
+                  }}
+                />
+              )}
+            </div>
+          )}
         {activeTool === "ruler" && (
           <div
             aria-hidden="true"

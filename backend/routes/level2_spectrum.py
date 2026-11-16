@@ -5,11 +5,11 @@ from schemas.query import QueryValidationError, parse_spectrum_query
 from services.irsa_archive import ArchiveUnavailableError
 from services.level2_spectrum import NoCoverageError, extract_spectrum
 
-spectrum_bp = Blueprint("spectrum", __name__, url_prefix="/api/spectrum")
+observations_bp = Blueprint("observations", __name__, url_prefix="/api/spectrum")
 
 
-@spectrum_bp.get("")
-def spectrum():
+@observations_bp.get("/observations")
+def observations_spectrum():
     try:
         query = parse_spectrum_query(request.args)
     except QueryValidationError as exc:

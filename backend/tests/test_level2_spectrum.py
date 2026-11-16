@@ -131,7 +131,7 @@ def test_bin_samples_clips_outliers_and_weights_by_variance():
     assert len(binned) == 2
     first, second = binned
     assert first["n"] == 3 and first["flux"] == pytest.approx(1.0, abs=1e-6)
-    assert first["wavelengthMin"] == pytest.approx(1.0)
+    assert first["wavelengthMinUm"] == pytest.approx(1.0)
     assert second["n"] == 2
     assert second["flux"] == pytest.approx((2.0 / 0.01 + 4.0 / 1.0) / (1 / 0.01 + 1 / 1.0))
     assert second["error"] == pytest.approx(np.sqrt(1 / (1 / 0.01 + 1 / 1.0)))
@@ -150,17 +150,17 @@ def test_extract_spectrum_assembles_payload(archive):
     payload = extract_spectrum(RA, DEC)
 
     assert payload["position"] == {"ra": RA, "dec": DEC}
-    assert payload["units"] == {"wavelength": "um", "flux": "MJy / sr"}
+    assert payload["unit"] == "MJy/sr"
     assert payload["status"] == "complete"
     assert payload["coverage"] == {
         "exposures": 3, "used": 3, "outOfBounds": 0, "failed": 0, "timedOut": 0, "detectors": [1, 2]
     }
-    waves = [p["wavelength"] for p in payload["points"]]
+    waves = [p["wavelengthUm"] for p in payload["points"]]
     assert waves == sorted(waves)
     assert {p["detector"] for p in payload["points"]} == {1, 2}
     assert {b["detector"] for b in payload["binned"]} == {1, 2}
     assert set(payload["points"][0]) == {
-        "wavelength", "bandwidth", "flux", "error", "zodi", "detector", "obsId", "mjd"
+        "wavelengthUm", "bandwidthUm", "flux", "error", "zodi", "detector", "obsId", "mjd"
     }
     # Only two WCS-WAVE table reads (one per detector) despite three exposures.
     wave_starts = {
@@ -264,14 +264,14 @@ def test_route_returns_payload(client, monkeypatch):
         "routes.level2_spectrum.extract_spectrum",
         lambda ra, dec, ap, dets: {"position": {"ra": ra, "dec": dec}, "aperturePx": ap, "points": []},
     )
-    resp = client.get("/api/spectrum", query_string={"ra": "10", "dec": "20", "aperturePx": "3"})
+    resp = client.get("/api/spectrum/observations", query_string={"ra": "10", "dec": "20", "aperturePx": "3"})
     assert resp.status_code == 200
     assert resp.get_json()["aperturePx"] == 3
     assert resp.headers["Cache-Control"] == "public, max-age=3600"
 
 
 def test_route_validates_input(client):
-    resp = client.get("/api/spectrum", query_string={"ra": "10", "dec": "20", "aperturePx": "2"})
+    resp = client.get("/api/spectrum/observations", query_string={"ra": "10", "dec": "20", "aperturePx": "2"})
     assert resp.status_code == 400
     assert resp.get_json()["error"]["code"] == "invalid_request"
 
@@ -283,9 +283,9 @@ def test_route_maps_service_errors(client, monkeypatch):
         return _inner
 
     monkeypatch.setattr("routes.level2_spectrum.extract_spectrum", raise_(NoCoverageError("none")))
-    assert client.get("/api/spectrum", query_string={"ra": "10", "dec": "20"}).status_code == 404
+    assert client.get("/api/spectrum/observations", query_string={"ra": "10", "dec": "20"}).status_code == 404
 
     monkeypatch.setattr("routes.level2_spectrum.extract_spectrum", raise_(ArchiveUnavailableError()))
-    resp = client.get("/api/spectrum", query_string={"ra": "10", "dec": "20"})
+    resp = client.get("/api/spectrum/observations", query_string={"ra": "10", "dec": "20"})
     assert resp.status_code == 502
     assert resp.get_json()["error"]["code"] == "image_source_unavailable"

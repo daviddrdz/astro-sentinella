@@ -29,8 +29,8 @@ BINS_PER_DETECTOR = 17
 MAX_WORKERS = 32
 DEADLINE_S = 25.0
 CLIP_SIGMA = 3.0
-FLUX_UNIT = "MJy / sr"
-WAVELENGTH_UNIT = "um"
+FLUX_UNIT = "MJy/sr"
+SOURCE = "SPHEREx DR1 Level-2 exposures (per-observation samples)"
 # Archive searches are slow (~20 s), so search on a coarse grid with a radius that
 # covers the whole cell; clicks within the same cell then share one cached result.
 # 0.05 deg matches the explorer's default field size.
@@ -232,9 +232,9 @@ def bin_samples(samples: list[Sample], ranges: dict[int, tuple[float, float]]) -
             total = weights.sum()
             binned.append(
                 {
-                    "wavelength": float((w * weights).sum() / total),
-                    "wavelengthMin": float(edges[b]),
-                    "wavelengthMax": float(edges[b + 1]),
+                    "wavelengthUm": float((w * weights).sum() / total),
+                    "wavelengthMinUm": float(edges[b]),
+                    "wavelengthMaxUm": float(edges[b + 1]),
                     "flux": float((f * weights).sum() / total),
                     "error": float(np.sqrt(1.0 / total)) if np.isfinite(e).all() and (e > 0).all() else None,
                     "detector": detector,
@@ -250,8 +250,8 @@ def _float_or_none(value: float) -> float | None:
 
 def _point(sample: Sample) -> dict:
     return {
-        "wavelength": sample.wavelength,
-        "bandwidth": sample.bandwidth,
+        "wavelengthUm": sample.wavelength,
+        "bandwidthUm": sample.bandwidth,
         "flux": _float_or_none(sample.flux),
         "error": _float_or_none(sample.error),
         "zodi": _float_or_none(sample.zodi),
@@ -329,7 +329,8 @@ def extract_spectrum(
         payload = {
             "position": {"ra": ra_deg, "dec": dec_deg},
             "aperturePx": aperture_px,
-            "units": {"wavelength": WAVELENGTH_UNIT, "flux": FLUX_UNIT},
+            "unit": FLUX_UNIT,
+            "source": SOURCE,
             **result,
         }
         if payload["status"] != "complete":
