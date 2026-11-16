@@ -14,13 +14,62 @@ This document defines conventions for implementing the Flask API consumed by the
   when no detector is specified. The legacy single-value `bands=2` parameter
   is ignored for initial loading and also uses the first available detector;
   explicit `detector` requests remain strict.
+- `GET /api/frames/spectrum?ra={ra}&dec={dec}&fieldSizeDeg={degrees}&observationDate={date}&x={0..1}&y={0..1}` returns the quick-look spectrum (flux vs wavelength, 102 SPHEREx channels) of the chunk under a click on the rendered frame image.
+- `GET /api/spectrum/observations?ra={ra}&dec={dec}[&aperturePx=1|3|5][&detectors=1,2,...]` returns the per-exposure spectrum at a sky position, assembled from one pixel of every Level-2 exposure covering it. Slow (seconds); meant as an opt-in detail view, not for the click path.
 
 Detector ranges are fixed by the SPHEREx instrument: D1 `0.75–1.11 µm`, D2
 `1.11–1.66 µm`, D3 `1.64–2.42 µm`, D4 `2.42–3.18 µm`, D5 `3.18–4.41 µm`,
 and D6 `4.41–5.00 µm`. FITS data is cached per detector URL after its first
 render, so selecting a date does not download all six files.
 
+### Chunk spectrum
+
+`x` and `y` are the click position as fractions of the rendered image (`x` left to right, `y` top to bottom). The backend owns the chunk grid: cells are about `SPECTRUM_CHUNK_ARCSEC` (default 26″, ~2 HiPS cube pixels) on a side, so the client never hard-codes the grid size. Chunk corners go through the frame's WCS to the sky and into the SPHEREx DR1 HiPS cube, where the cube pixels inside the chunk are averaged per channel. The cube is an all-mission mosaic: the spectrum is of the sky region, not of the selected observation date, and it is for visualization only.
+
+```json
+{
+  "chunk": { "row": 0, "col": 3, "rows": 7, "cols": 7, "sizeArcsec": 25.48,
+             "bounds": { "left": 0.4286, "top": 0.0, "width": 0.1429, "height": 0.1429 } },
+  "center": { "ra": 133.79, "dec": -7.24 },
+  "pixelCount": 4,
+  "unit": "MJy/sr",
+  "source": "SPHEREx DR1 HiPS cube (all-mission mosaic, quick-look)",
+  "points": [ { "wavelengthUm": 0.7536, "bandwidthUm": 0.0189, "flux": 0.42 }, "... 102 items, sorted by wavelength; flux is null for channels without coverage" ]
+}
+```
+
+Errors: `400 invalid_request`, `404 image_not_found` (no frame on that date), `404 spectrum_unavailable` (no cube coverage for the chunk), `502 spectrum_source_unavailable`. The route has its own rate limit, `SPECTRUM_RATE_LIMIT` (default `30 per minute`).
+
+The field cube behind this endpoint is prefetched in the background whenever `/api/frames/image` renders a frame, so the first click on a freshly loaded frame is usually served from cache.
+
 Keep these contracts aligned with the frontend types and service validation in `frontend/src/types/portal.ts`, `frontend/src/types/explorer.ts`, `frontend/src/services/metadataService.ts`, and `frontend/src/services/framesService.ts`.
+
+### Observations spectrum response
+
+```json
+{
+  "position": { "ra": 10.68, "dec": 41.27 },
+  "aperturePx": 1,
+  "unit": "MJy/sr",
+  "source": "SPHEREx DR1 Level-2 exposures (per-observation samples)",
+  "points": [
+    { "wavelengthUm": 0.75, "bandwidthUm": 0.018, "flux": 95.2, "error": 0.38, "zodi": 0.15,
+      "detector": 1, "obsId": "2025W28_1B_0480_4", "mjd": 60865.62 }
+  ],
+  "binned": [
+    { "wavelengthUm": 0.75, "wavelengthMinUm": 0.745, "wavelengthMaxUm": 0.764, "flux": 95.2,
+      "error": 0.38, "detector": 1, "n": 1 }
+  ],
+  "coverage": { "exposures": 229, "used": 171, "outOfBounds": 1, "failed": 0, "timedOut": 57,
+                "detectors": [1, 2, 3, 4, 5, 6] },
+  "status": "complete" | "partial"
+}
+```
+
+- `points` are raw per-exposure samples sorted by wavelength, already zodiacal-light subtracted (`zodi` is the subtracted value). `flux`/`error`/`zodi`/`mjd` are `null` when unavailable.
+- `binned` is the chart series: inverse-variance weighted means in 17 log-spaced bins per detector (at most 102 bins), after 3-sigma clipping. `error` is `null` when any member lacks a variance.
+- `status` is `partial` when some exposures failed or exceeded the server deadline; the payload is still usable and is not cached.
+- Errors: `400 invalid_request`, `404 no_coverage` (no exposures at the position), `502 image_source_unavailable`. Rate limit: `OBSERVATIONS_RATE_LIMIT` (default `6 per minute`).
 
 ## Request Validation
 
