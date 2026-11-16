@@ -206,9 +206,12 @@ export function ExplorerCanvas({
     ? (statusByUrl[primaryKey] ?? "loading")
     : "loaded";
 
-  const obsDateForTiles = (
-    activeFrame?.timestamp ?? query.observationDate
-  ).trim();
+  const rawTimestamp = activeFrame?.timestamp?.trim() ?? "";
+  const isIsoDate = /^\d{4}-\d{2}-\d{2}$/.test(rawTimestamp);
+  const obsDateForTiles = isIsoDate
+    ? rawTimestamp
+    : query.observationDate.trim();
+  const detectorForTiles = activeFrame?.detector ?? activeFrame?.band;
   const canLoadNeighborTiles = !primaryUrl || primaryStatus === "loaded";
   const maxRing =
     zoomLevel < ZOOM_OUT_OUTER_RING_THRESHOLD
@@ -260,6 +263,9 @@ export function ExplorerCanvas({
                 fieldSizeDeg: String(fieldDeg),
                 observationDate: obsDateForTiles,
               });
+              if (detectorForTiles !== undefined) {
+                params.set("detector", String(detectorForTiles));
+              }
               imageUrl = `${EXPLORER_CONFIG.framesEndpoint}/image?${params.toString()}`;
             }
             const key = `${col}:${row}`;
