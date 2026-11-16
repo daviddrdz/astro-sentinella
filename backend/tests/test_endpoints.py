@@ -87,8 +87,10 @@ def test_metadata_response_contract(client, monkeypatch):
 
 
 def test_frame_list_response_and_normalized_query(client, monkeypatch):
-    frames = [{"id": "spherex-0", "timestamp": "02:00Z", "band": "IR",
-               "filtered": False, "visible": True, "imageUrl": "/api/frames/image"}]
+    frames = [{"id": "spherex-0-d1", "timestamp": "02:00Z", "band": 1,
+               "detector": 1, "wavelengthMinUm": 0.75, "wavelengthMaxUm": 1.11,
+               "filtered": False, "visible": True,
+               "imageUrl": "/api/frames/image?detector=1"}]
     service = Mock(return_value=frames)
     monkeypatch.setattr(ROUTES[1][1], service)
     response = client.get("/api/frames", query_string={
@@ -117,13 +119,13 @@ def test_image_response_and_cache_header(client, monkeypatch, field_size):
     arguments = (133.795, -7.2455, date(2025, 5, 1))
     if field_size is not None:
         query["fieldSizeDeg"] = field_size
-        arguments += (2.0,)
     response = client.get("/api/frames/image", query_string=query)
     assert response.status_code == 200
     assert response.mimetype == "image/png"
     assert response.data == service.return_value
     assert response.headers["Cache-Control"] == "public, max-age=3600"
-    service.assert_called_once_with(*arguments)
+    options = {"size_deg": 2.0} if field_size is not None else {}
+    service.assert_called_once_with(*arguments, **options)
 
 
 def test_image_not_found(client, monkeypatch):
@@ -191,20 +193,23 @@ def test_only_calendar_dates_with_hyphens_are_accepted(client, monkeypatch, endp
     service.assert_not_called()
 
 
-@pytest.mark.xfail(
-    strict=True, raises=AssertionError,
-    reason="Known bug: all frames on a date link to the earliest image of that day",
-)
-def test_each_timeline_frame_downloads_its_own_image(client, monkeypatch):
+def test_each_detector_frame_downloads_its_own_image(client, monkeypatch):
     from astropy.table import Table
     from astropy.time import Time
     from services import frames_service
 
     start = Time("2025-05-01", scale="utc").mjd
-    table = Table({"t_min": [start + 0.75, start], "access_url": ["late.fits", "early.fits"]})
+    table = Table({
+        "t_min": [start + 0.75, start],
+        "access_url": ["late.fits", "early.fits"],
+        "energy_bandpassname": ["D4", "D1"],
+    })
     monkeypatch.setattr(frames_service, "search_images", Mock(return_value=table))
     # Keep routing, selection, and caching real; replace only image rendering.
-    monkeypatch.setattr(frames_service, "_render_png", lambda source, *args: source.encode())
+    monkeypatch.setattr(
+        frames_service, "render_image_png",
+        lambda coords, **options: next(iter(coords["sources"].values())).encode(),
+    )
 
     listing = client.get("/api/frames", query_string=QUERY)
     assert listing.status_code == 200

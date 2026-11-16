@@ -19,8 +19,8 @@ network access is blocked during tests. Temporary FITS files are generated local
 All backend tests live in this directory, including the original endpoint tests.
 
 Known regressions are marked `xfail(strict=True, raises=AssertionError)`:
-unexpected errors returning HTML, non-YYYY-MM-DD dates being accepted, and
-multiple timeline frames downloading the same earliest image. These tests run
+unexpected errors returning HTML and non-YYYY-MM-DD dates being accepted. Detector
+frame downloads now have an ordinary regression test. These tests run
 and report expected failures; remove the corresponding marker when fixing each
 bug. An unexpected pass fails the suite so the marker cannot silently become stale.
 Use `python -m pytest tests -q -rx` from `backend/` to see the reasons, or add

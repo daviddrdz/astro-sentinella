@@ -20,7 +20,7 @@ def test_provider_query_uses_expected_collection_and_search_radius(monkeypatch):
     service.search.return_value.to_table.return_value = table
     factory = Mock(return_value=service)
     monkeypatch.setattr(archive, "SIA2Service", factory)
-    assert archive._query_images(1, 2) is table
+    assert archive._query_images(1, 2, 0.01) is table
     factory.assert_called_once_with(archive.SIA_URL)
     service.search.assert_called_once_with(pos=(1, 2, 0.01), collection="spherex_dr1")
 
@@ -53,7 +53,7 @@ def test_rejected_queries_are_not_retried(monkeypatch, sleep):
     monkeypatch.setattr(archive, "_query_images", query)
     with pytest.raises(archive.ArchiveUnavailableError):
         archive.search_images(1, 2)
-    query.assert_called_once_with(1, 2)
+    query.assert_called_once_with(1, 2, 0.01)
     sleep.assert_not_called()
 
 
@@ -64,7 +64,17 @@ def test_archive_cache_reuses_coordinates_but_separates_positions(monkeypatch):
     assert archive.search_images(1, 2) is first
     assert archive.search_images(1, 2) is first
     assert archive.search_images(3, 2) is second
-    assert query.call_args_list == [call(1, 2), call(3, 2)]
+    assert query.call_args_list == [call(1, 2, 0.01), call(3, 2, 0.01)]
+
+
+def test_archive_cache_separates_search_radii(monkeypatch):
+    narrow, wide = Table(), Table()
+    query = Mock(side_effect=[narrow, wide])
+    monkeypatch.setattr(archive, "_query_images", query)
+    assert archive.search_images(1, 2, 0.01) is narrow
+    assert archive.search_images(1, 2, 0.1) is wide
+    assert archive.search_images(1, 2, 0.01) is narrow
+    assert query.call_args_list == [call(1, 2, 0.01), call(1, 2, 0.1)]
 
 
 def test_unexpected_errors_are_not_retried(sleep):

@@ -49,7 +49,7 @@ describe("frame response validation", () => {
   const valid = {
     id: "frame-1",
     timestamp: "02:00Z",
-    band: "IR",
+    band: 1,
     filtered: false,
     visible: true,
   };
@@ -77,6 +77,10 @@ describe("frame response validation", () => {
     { ...valid, id: 42 },
     { ...valid, timestamp: null },
     { ...valid, band: "unknown" },
+    { ...valid, band: "IR" },
+    { ...valid, band: 0 },
+    { ...valid, band: 7 },
+    { ...valid, band: 1.5 },
     { ...valid, filtered: "false" },
     { ...valid, visible: 1 },
   ])(
@@ -89,14 +93,11 @@ describe("frame response validation", () => {
     }
   );
 
-  it.each(["Ha", "OIII", "IR", "UV", "BB"])(
-    "accepts supported band %s",
-    async (band) => {
-      const frame = { ...valid, band, imageUrl: "/api/frames/image" };
-      vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json([frame]));
-      expect(await fetchExplorerFrames(SAMPLE_QUERY)).toEqual([frame]);
-    }
-  );
+  it.each([1, 2, 3, 4, 5, 6])("accepts supported band %s", async (band) => {
+    const frame = { ...valid, band, imageUrl: "/api/frames/image" };
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json([frame]));
+    expect(await fetchExplorerFrames(SAMPLE_QUERY)).toEqual([frame]);
+  });
 
   it("encodes all trimmed query parameters and forwards cancellation", async () => {
     const fetch = vi

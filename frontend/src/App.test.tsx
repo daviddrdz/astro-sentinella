@@ -13,6 +13,16 @@ import {
   PORTAL_PLACEHOLDERS,
 } from "./config/app";
 
+// The real debounce is covered with fake timers in QueryPortalCard.test.tsx.
+// App integration tests should wait for the result, not race a 600ms timer.
+vi.mock("./config/app", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./config/app")>();
+  return {
+    ...actual,
+    APP_CONFIG: { ...actual.APP_CONFIG, metadataDebounceMs: 0 },
+  };
+});
+
 describe("Astro Sentinella Portal", () => {
   afterEach(() => {
     window.localStorage.clear();
@@ -23,7 +33,6 @@ describe("Astro Sentinella Portal", () => {
   it("renders navbar links and the four portal query inputs", () => {
     render(<App />);
 
-    expect(screen.getByTestId("portal-space-backdrop")).toBeInTheDocument();
     expect(screen.getByTestId("portal-space-backdrop")).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: APP_CONFIG.name })

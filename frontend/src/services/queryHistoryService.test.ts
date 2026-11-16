@@ -87,15 +87,21 @@ describe("query history", () => {
     expect(set).not.toHaveBeenCalled();
   });
 
-  it("handles storage read and write failures", () => {
+  it("handles storage read failures", () => {
     vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
       throw new Error("Denied");
     });
+    expect(loadQueryHistory()).toEqual([]);
+  });
+
+  it("returns updated history when writing fails without losing the stored entries", () => {
+    saveQueryHistoryEntry(QUERY);
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
       throw new Error("Quota exceeded");
     });
-    expect(loadQueryHistory()).toEqual([]);
-    expect(saveQueryHistoryEntry(QUERY)).toEqual([QUERY]);
+    const next = { ...QUERY, ra: "84" };
+    expect(saveQueryHistoryEntry(next)).toEqual([next, QUERY]);
+    expect(loadQueryHistory()).toEqual([QUERY]);
   });
 
   it("clears only application history", () => {
