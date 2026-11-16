@@ -21,6 +21,7 @@ BLOCK = 2880
 FIRST_HEADER_CHUNK = BLOCK * 10
 HEADER_CHUNK = BLOCK * 6
 REQUEST_TIMEOUT_S = 15
+DOWNLOAD_TIMEOUT_S = 120
 LAYOUT_CACHE = TTLCache(ttl_s=6 * 3600, max_items=1024)
 
 _END_CARD = b"END" + b" " * 77
@@ -78,6 +79,20 @@ def _fetch(url: str, start: int, end: int) -> tuple[bytes, int | None]:
 
 def read_range(url: str, start: int, end: int) -> bytes:
     return _fetch(url, start, end)[0]
+
+
+def download(url: str) -> bytes:
+    """GET a whole file through the pooled session (honours REQUESTS_CA_BUNDLE).
+
+    Single attempt: callers that want retries wrap this themselves. 5xx surfaces
+    as ``requests.HTTPError`` (an ``OSError``) so generic I/O retry loops apply.
+    """
+    resp = _session.get(url, timeout=DOWNLOAD_TIMEOUT_S)
+    if resp.status_code >= 500:
+        raise requests.HTTPError(f"HTTP {resp.status_code}", response=resp)
+    if resp.status_code != 200:
+        raise RemoteFitsError(f"Download failed with HTTP {resp.status_code}")
+    return resp.content
 
 
 def _find_end_card(buf: bytes, offset: int) -> int:

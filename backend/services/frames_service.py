@@ -7,6 +7,7 @@ from astropy.time import Time
 from astropy.utils.data import conf
 from astropy.wcs import WCS
 from services.cache import TTLCache
+from services.fits_remote import RemoteFitsError
 from services.image_renderer import _download_fits_image, render_image_png
 
 from services.irsa_archive import ArchiveUnavailableError, search_images
@@ -126,7 +127,7 @@ def _render_png(
             size=None,
             image_loader=load,
         )
-    except OSError as exc:
+    except (OSError, RemoteFitsError) as exc:
         raise ArchiveUnavailableError("Image download failed.") from exc
 
 

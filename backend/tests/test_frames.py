@@ -152,6 +152,48 @@ def test_render_png_produces_png_bytes(monkeypatch, tmp_path):
     assert png.startswith(b"\x89PNG")
 
 
+def test_remote_fits_is_fetched_with_requests_not_astropy(monkeypatch):
+    import io
+
+    import numpy as np
+    from astropy.io import fits
+
+    from services import image_renderer
+
+    buf = io.BytesIO()
+    fits.HDUList([fits.PrimaryHDU(), fits.ImageHDU(np.random.rand(8, 8), name="IMAGE")]).writeto(buf)
+    requested = []
+
+    def fake_download(url):
+        requested.append(url)
+        return buf.getvalue()
+
+    monkeypatch.setattr(image_renderer, "download", fake_download)
+    monkeypatch.setattr(
+        fits, "open", lambda target, **kw: pytest.fail("astropy must not open URLs")
+        if isinstance(target, str) else fits.HDUList.fromstring(target.getvalue())
+    )
+
+    data, _ = image_renderer._download_fits_image("https://irsa.test/f.fits", 1.0, 2.0, 0.05)
+
+    assert data.shape == (8, 8)
+    assert requested == ["https://irsa.test/f.fits?center=1.0,2.0d&size=0.05d"]
+
+
+def test_remote_fits_client_errors_become_archive_errors(monkeypatch):
+    from services import image_renderer
+    from services.fits_remote import RemoteFitsError
+
+    def not_found(url):
+        raise RemoteFitsError("Download failed with HTTP 404")
+
+    monkeypatch.setattr(image_renderer, "download", not_found)
+    monkeypatch.setattr(frames_service, "_find_image_url", lambda *_: "https://irsa.test/f.fits")
+
+    with pytest.raises(ArchiveUnavailableError):
+        frames_service.get_sky_image_png(1.0, 2.0, date(2025, 5, 1))
+
+
 def test_render_image_png_supports_multiple_bands():
     import numpy as np
     from astropy.wcs import WCS

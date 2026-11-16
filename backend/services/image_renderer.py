@@ -9,6 +9,7 @@ from astropy.nddata import Cutout2D
 from astropy.wcs import WCS
 from matplotlib.figure import Figure
 
+from services.fits_remote import download
 from services.irsa_archive import with_retries
 
 DEFAULT_COLOR = "magma"
@@ -35,6 +36,14 @@ def _image_hdu(hdul: fits.HDUList) -> fits.ImageHDU | fits.PrimaryHDU:
     return hdul[1]
 
 
+def _open_fits(target: str) -> fits.HDUList:
+    # astropy's own downloader pins certifi's CA bundle and ignores SSL_CERT_FILE,
+    # so remote files go through requests and are opened from memory.
+    if target.startswith(("http://", "https://")):
+        return fits.open(io.BytesIO(download(target)), memmap=False)
+    return fits.open(target, memmap=False, cache=False)
+
+
 def _download_fits_image(
     fits_url: str,
     ra_deg: float,
@@ -50,7 +59,7 @@ def _download_fits_image(
         target = fits_url
 
     def load():
-        with fits.open(target, memmap=False, cache=False) as hdul:
+        with _open_fits(target) as hdul:
             image_hdu = _image_hdu(hdul)
             image_data = np.array(image_hdu.data, dtype=np.float32)
             wcs = WCS(image_hdu.header)

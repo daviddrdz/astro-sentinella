@@ -26,6 +26,7 @@ from matplotlib.path import Path
 
 from services import hips_cube
 from services.cache import TTLCache
+from services.fits_remote import RemoteFitsError
 from services.frames_service import (
     FRAME_GEOMETRY_CACHE,
     FrameGeometry,
@@ -68,7 +69,7 @@ def get_frame_geometry(
         fits_url = _find_image_url(ra_deg, dec_deg, observation_date)
         try:
             data, wcs = _download_fits_image(fits_url, ra_deg, dec_deg, size_deg)
-        except OSError as exc:
+        except (OSError, RemoteFitsError) as exc:
             raise ArchiveUnavailableError("Image download failed.") from exc
         if not wcs.has_celestial:
             raise SpectrumUnavailableError("The frame has no sky coordinates.")
