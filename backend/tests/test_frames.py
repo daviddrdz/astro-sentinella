@@ -7,6 +7,7 @@ from astropy.time import Time
 from app import app
 from schemas.query import QueryValidationError, parse_sky_image_query
 from services import frames_service, irsa_archive
+from services.image_renderer import render_image_png
 from services.frames_service import ImageNotFoundError, select_image_url_for_date
 from services.irsa_archive import ArchiveUnavailableError
 
@@ -100,15 +101,170 @@ def test_image_route_hides_upstream_errors(client, monkeypatch):
     assert "secret" not in resp.get_data(as_text=True)
 
 
+def test_image_route_prefetches_field_cube_only_on_success(client, monkeypatch):
+    prefetches = []
+    monkeypatch.setattr("routes.frames.prefetch_field_cube", lambda *args: prefetches.append(args))
+    monkeypatch.setattr("routes.frames.get_sky_image_png", lambda *_, **__: b"\x89PNG")
+
+    client.get("/api/frames/image", query_string={**VALID_ARGS, "fieldSizeDeg": "0.1"})
+    assert prefetches == [(133.795, -7.2455, 0.1)]
+
+    def missing(*_, **__):
+        raise ImageNotFoundError("none")
+
+    monkeypatch.setattr("routes.frames.get_sky_image_png", missing)
+    client.get("/api/frames/image", query_string=VALID_ARGS)
+    assert len(prefetches) == 1
+
+
+def test_rendering_records_frame_geometry(monkeypatch, tmp_path):
+    import numpy as np
+    from astropy.io import fits
+    from astropy.wcs import WCS
+
+    w = WCS(naxis=2)
+    w.wcs.ctype = ["RA---TAN", "DEC--TAN"]
+    w.wcs.crval = [133.795, -7.2455]
+    w.wcs.crpix = [8.5, 8.5]
+    w.wcs.cdelt = [-6.15 / 3600, 6.15 / 3600]
+    path = tmp_path / "img.fits"
+    fits.HDUList(
+        [fits.PrimaryHDU(), fits.ImageHDU(np.random.rand(16, 16), header=w.to_header())]
+    ).writeto(path)
+    monkeypatch.setattr(frames_service, "search_images", lambda *_: Table({"t_min": []}))
+    monkeypatch.setattr(frames_service, "_find_image_url", lambda *_: str(path))
+
+    frames_service.get_sky_image_png(133.795, -7.2455, date(2025, 5, 1), 0.05)
+
+    key = frames_service.frame_geometry_key(133.795, -7.2455, date(2025, 5, 1), 0.05)
+    geometry = frames_service.FRAME_GEOMETRY_CACHE.get_or_compute(key, lambda: None)
+    # Geometry must describe the cropped cutout that was actually rendered.
+    rendered, _ = frames_service._download_fits_image(str(path), 133.795, -7.2455, 0.05)
+    assert geometry.shape == rendered.shape
+    assert geometry.wcs.wcs.crval.tolist() == [133.795, -7.2455]
+
+
 def test_render_png_produces_png_bytes(monkeypatch, tmp_path):
     import numpy as np
     from astropy.io import fits
 
     path = tmp_path / "img.fits"
     fits.HDUList([fits.PrimaryHDU(), fits.ImageHDU(np.random.rand(16, 16))]).writeto(path)
-    monkeypatch.setattr(frames_service, "FIGURE_DPI", 10)
 
     png = frames_service._render_png(str(path))
+    assert png.startswith(b"\x89PNG")
+
+
+def test_remote_fits_is_fetched_with_requests_not_astropy(monkeypatch):
+    import io
+
+    import numpy as np
+    from astropy.io import fits
+
+    from services import image_renderer
+
+    buf = io.BytesIO()
+    fits.HDUList([fits.PrimaryHDU(), fits.ImageHDU(np.random.rand(8, 8), name="IMAGE")]).writeto(buf)
+    requested = []
+
+    def fake_download(url):
+        requested.append(url)
+        return buf.getvalue()
+
+    monkeypatch.setattr(image_renderer, "download", fake_download)
+    monkeypatch.setattr(
+        fits, "open", lambda target, **kw: pytest.fail("astropy must not open URLs")
+        if isinstance(target, str) else fits.HDUList.fromstring(target.getvalue())
+    )
+
+    data, _ = image_renderer._download_fits_image("https://irsa.test/f.fits", 1.0, 2.0, 0.05)
+
+    assert data.shape == (8, 8)
+    assert requested == ["https://irsa.test/f.fits?center=1.0,2.0d&size=0.05d"]
+
+
+def test_remote_fits_client_errors_become_archive_errors(monkeypatch):
+    from services import image_renderer
+    from services.fits_remote import RemoteFitsError
+
+    def not_found(url):
+        raise RemoteFitsError("Download failed with HTTP 404")
+
+    monkeypatch.setattr(image_renderer, "download", not_found)
+    monkeypatch.setattr(frames_service, "_find_image_url", lambda *_: "https://irsa.test/f.fits")
+
+    with pytest.raises(ArchiveUnavailableError):
+        frames_service.get_sky_image_png(1.0, 2.0, date(2025, 5, 1))
+
+
+def test_download_fits_image_crops_to_requested_sky_size(tmp_path):
+    import numpy as np
+    from astropy.io import fits
+    from astropy.wcs import WCS
+
+    path = tmp_path / "large.fits"
+    wcs = WCS(naxis=2)
+    wcs.wcs.crpix = [50, 50]
+    wcs.wcs.cdelt = [-0.01, 0.01]
+    wcs.wcs.crval = [10.0, 20.0]
+    wcs.wcs.ctype = ["RA---TAN", "DEC--TAN"]
+    fits.HDUList(
+        [
+            fits.PrimaryHDU(),
+            fits.ImageHDU(
+                np.ones((100, 100), dtype=np.float32), header=wcs.to_header()
+            ),
+        ]
+    ).writeto(path)
+
+    image, cropped_wcs = frames_service._download_fits_image(
+        str(path), 10.0, 20.0, 0.2
+    )
+
+    assert image.shape == (20, 20)
+    assert cropped_wcs.has_celestial
+
+
+def test_render_image_png_supports_multiple_bands():
+    import numpy as np
+    from astropy.wcs import WCS
+
+    def loader(source):
+        return np.arange(256, dtype=float).reshape(16, 16) + int(source), WCS()
+
+    png = render_image_png(
+        {
+            "sources": {1: "1", 2: "2"},
+            "ra": 133.795,
+            "dec": -7.2455,
+        },
+        bands=[1, 2],
+        target_px=100,
+        image_loader=loader,
+    )
+
+    assert png.startswith(b"\x89PNG")
+
+
+def test_render_image_png_blends_views_with_different_shapes():
+    import numpy as np
+    from astropy.wcs import WCS
+
+    def loader(source):
+        shape = (16, 16) if source == "wide" else (14, 12)
+        return np.arange(np.prod(shape), dtype=float).reshape(shape), WCS()
+
+    png = render_image_png(
+        {
+            "sources": {1: "wide", 2: "narrow"},
+            "ra": 133.795,
+            "dec": -7.2455,
+        },
+        bands=[1, 2],
+        target_px=100,
+        image_loader=loader,
+    )
+
     assert png.startswith(b"\x89PNG")
 
 
@@ -121,6 +277,56 @@ def test_find_image_url_raises_not_found_for_date_without_images(monkeypatch):
         frames_service._find_image_url(1.0, 2.0, date(2025, 5, 6))
 
 
+def test_legacy_single_band_uses_first_available_detector(monkeypatch):
+    table = Table(
+        {
+            "t_min": [
+                _mjd("2025-05-05T10:00:00"),
+                _mjd("2025-05-05T11:00:00"),
+            ],
+            "energy_bandpassname": ["SPHEREx-D3", "SPHEREx-D6"],
+            "access_url": ["d3", "d6"],
+        }
+    )
+    monkeypatch.setattr(frames_service, "search_images", lambda ra, dec: table)
+    monkeypatch.setattr(
+        frames_service,
+        "render_image_png",
+        lambda coords, **kwargs: coords["sources"],
+    )
+
+    result = frames_service.get_sky_image_png(
+        1.0, 2.0, date(2025, 5, 5), bands=(2,)
+    )
+
+    assert result == {3: "d3"}
+
+
+def test_comparison_uses_one_source_per_detector(monkeypatch):
+    table = Table(
+        {
+            "t_min": [
+                _mjd("2025-05-05T10:00:00"),
+                _mjd("2025-05-05T10:00:00"),
+            ],
+            "energy_bandpassname": ["SPHEREx-D1", "SPHEREx-D4"],
+            "access_url": ["d1", "d4"],
+        }
+    )
+    monkeypatch.setattr(frames_service, "search_images", lambda ra, dec: table)
+    monkeypatch.setattr(
+        frames_service,
+        "render_image_png",
+        lambda coords, **kwargs: coords["sources"],
+    )
+
+    result = frames_service.get_sky_image_png(
+        1.0, 3.0, date(2025, 5, 5), detectors=(1, 4)
+    )
+
+    assert result == {1: "d1", 4: "d4"}
+
+
 def test_image_download_retries_then_fails(monkeypatch):
     attempts = []
     monkeypatch.setattr(irsa_archive.time, "sleep", lambda _: None)
@@ -129,6 +335,6 @@ def test_image_download_retries_then_fails(monkeypatch):
         attempts.append(url)
         raise OSError("connection reset")
 
-    monkeypatch.setattr(frames_service, "_download_image_data", broken)
+    monkeypatch.setattr(frames_service, "_download_render_image", broken)
     with pytest.raises(ArchiveUnavailableError):
         frames_service._render_png("https://example/img.fits")

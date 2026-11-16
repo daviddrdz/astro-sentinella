@@ -1,15 +1,16 @@
 import { X } from "lucide-react";
-import { EXPLORER_CONFIG, EXPLORER_COPY } from "../../config/explorer";
-import type {
-  ExplorerLayer,
-  ExplorerLocale,
-  LayerFilterId,
-} from "../../types/explorer";
+import {
+  EXPLORER_CONFIG,
+  EXPLORER_COPY,
+  type BandChannelOption,
+} from "../../config/explorer";
+import type { ExplorerLayer, ExplorerLocale } from "../../types/explorer";
 import { LayersInspector } from "./LayersInspector";
 
 interface MobileLayersDrawerProps {
   open: boolean;
   layers: ExplorerLayer[];
+  availableChannels: readonly BandChannelOption[];
   activeLayerId: string;
   locale: ExplorerLocale;
   onClose: () => void;
@@ -17,13 +18,13 @@ interface MobileLayersDrawerProps {
   onToggleLayerVisibility: (id: string) => void;
   onAddLayer: () => void;
   onUpdateLayer: (id: string, patch: Partial<ExplorerLayer>) => void;
-  onToggleLayerFilter: (id: string, filterId: LayerFilterId) => void;
   onMergeVisible: () => void;
 }
 
 export function MobileLayersDrawer({
   open,
   layers,
+  availableChannels,
   activeLayerId,
   locale,
   onClose,
@@ -31,7 +32,6 @@ export function MobileLayersDrawer({
   onToggleLayerVisibility,
   onAddLayer,
   onUpdateLayer,
-  onToggleLayerFilter,
   onMergeVisible,
 }: MobileLayersDrawerProps) {
   if (!open) {
@@ -67,13 +67,13 @@ export function MobileLayersDrawer({
         <div className="min-h-0 flex-1">
           <LayersInspector
             layers={layers}
+            availableChannels={availableChannels}
             activeLayerId={activeLayerId}
             locale={locale}
             onSelectLayer={onSelectLayer}
             onToggleLayerVisibility={onToggleLayerVisibility}
             onAddLayer={onAddLayer}
             onUpdateLayer={onUpdateLayer}
-            onToggleLayerFilter={onToggleLayerFilter}
             onMergeVisible={onMergeVisible}
           />
         </div>

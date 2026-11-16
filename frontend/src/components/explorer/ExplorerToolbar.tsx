@@ -1,4 +1,5 @@
 import {
+  ChartSpline,
   Columns2,
   Diff,
   Hand,
@@ -31,6 +32,8 @@ function ToolIcon({ id }: { id: ExplorerToolId }) {
       return <SquareDashed size={size} aria-hidden="true" />;
     case "ruler":
       return <Ruler size={size} aria-hidden="true" />;
+    case "spectrum":
+      return <ChartSpline size={size} aria-hidden="true" />;
     case "reset":
       return <RotateCcw size={size} aria-hidden="true" />;
   }

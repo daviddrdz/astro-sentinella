@@ -7,7 +7,7 @@ from typing import TypeVar
 from astropy.table import Table
 from pyvo.dal import DALQueryError, DALServiceError, SIA2Service
 
-SIA_URL = "https://irsa.ipac.caltech.edu/SIA"
+SIA_URL = "https://irsa.ipac.caltech.edu/SIA?"
 COLLECTION = "spherex_dr1"
 SEARCH_RADIUS_DEG = 0.01
 MAX_RETRIES = 3
@@ -42,23 +42,25 @@ def with_retries(
     raise AssertionError("unreachable")
 
 
-def _query_images(ra_deg: float, dec_deg: float) -> Table:
+def _query_images(ra_deg: float, dec_deg: float, radius_deg: float) -> Table:
     return (
         SIA2Service(SIA_URL)
-        .search(pos=(ra_deg, dec_deg, SEARCH_RADIUS_DEG), collection=COLLECTION)
+        .search(pos=(ra_deg, dec_deg, radius_deg), collection=COLLECTION)
         .to_table()
     )
 
 
-def search_images(ra_deg: float, dec_deg: float) -> Table:
+def search_images(ra_deg: float, dec_deg: float, radius_deg: float = SEARCH_RADIUS_DEG) -> Table:
     def compute():
         try:
             return with_retries(
-                lambda: _query_images(ra_deg, dec_deg),
+                lambda: _query_images(ra_deg, dec_deg, radius_deg),
                 (DALServiceError,),
                 "Image archive query",
             )
         except (DALServiceError, DALQueryError) as exc:
             raise ArchiveUnavailableError("Image archive query failed.") from exc
 
-    return SEARCH_CACHE.get_or_compute((round(ra_deg, 4), round(dec_deg, 4)), compute)
+    return SEARCH_CACHE.get_or_compute(
+        (round(ra_deg, 4), round(dec_deg, 4), radius_deg), compute
+    )

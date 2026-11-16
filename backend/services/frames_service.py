@@ -1,39 +1,55 @@
-import io
 from datetime import date
+import logging
+from dataclasses import dataclass
 
 import numpy as np
-from astropy.io import fits
 from astropy.table import Table
 from astropy.time import Time
 from astropy.utils.data import conf
-from astropy.visualization import AsymmetricPercentileInterval, AsinhStretch, ImageNormalize
-from matplotlib.figure import Figure
+from astropy.wcs import WCS
 from services.cache import TTLCache
+from services.fits_remote import RemoteFitsError
+from services.image_renderer import _download_fits_image, render_image_png
 
-from services.irsa_archive import ArchiveUnavailableError, search_images, with_retries
+from services.irsa_archive import ArchiveUnavailableError, search_images
 
 conf.remote_timeout = 120
-
-FIGURE_SIZE_IN = 6
-FIGURE_DPI = 100
-
-# Bits de artefactos severos en FLAGS (SPHEREx Explanatory Supplement, Tabla 16)
-BAD_PIXEL_MASK = (
-    (1 << 0)   # TRANSIENT
-    | (1 << 1)   # OVERFLOW
-    | (1 << 2)   # SUR_ERROR
-    | (1 << 6)   # NONFUNC
-    | (1 << 9)   # MISSING_DATA
-    | (1 << 10)  # HOT
-    | (1 << 11)  # COLD
-    | (1 << 27)  # SNOWBALL
-)
+logger = logging.getLogger(__name__)
 
 PNG_CACHE = TTLCache(ttl_s=3600, max_items=32)
+FITS_CACHE = TTLCache(ttl_s=3600, max_items=32)
+# WCS + shape of rendered cutouts, filled as a by-product of rendering so the
+# spectrum endpoint never has to re-download a frame just to map a click.
+FRAME_GEOMETRY_CACHE = TTLCache(ttl_s=3600, max_items=64)
+
+DETECTOR_WAVELENGTHS_UM = {
+    1: (0.75, 1.11),
+    2: (1.11, 1.66),
+    3: (1.64, 2.42),
+    4: (2.42, 3.18),
+    5: (3.18, 4.41),
+    6: (4.41, 5.00),
+}
 
 
 class ImageNotFoundError(Exception):
     pass
+
+
+@dataclass(frozen=True)
+class FrameGeometry:
+    wcs: WCS  # celestial WCS of the rendered cutout
+    shape: tuple[int, int]  # (ny, nx) of the rendered cutout
+
+
+def frame_geometry_key(ra_deg: float, dec_deg: float, observation_date: date, size_deg: float):
+    return (round(ra_deg, 5), round(dec_deg, 5), observation_date, size_deg)
+
+
+def remember_frame_geometry(key, image_data: np.ndarray, wcs: WCS) -> None:
+    if wcs.has_celestial:
+        geometry = FrameGeometry(wcs.celestial, tuple(int(n) for n in image_data.shape[-2:]))
+        FRAME_GEOMETRY_CACHE.get_or_compute(key, lambda: geometry)
 
 
 def _rows_on_date(table: Table, observation_date: date) -> np.ndarray:
@@ -44,9 +60,69 @@ def _rows_on_date(table: Table, observation_date: date) -> np.ndarray:
     return np.flatnonzero((t_min >= day_start) & (t_min < day_start + 1))
 
 
-def select_image_url_for_date(table: Table, observation_date: date) -> str | None:
-    """Return the access URL of the earliest image whose t_min (MJD) falls on the date."""
+def _detector_number(value: object) -> int | None:
+    if isinstance(value, (int, np.integer)) and int(value) in DETECTOR_WAVELENGTHS_UM:
+        return int(value)
+    text = str(value).strip().upper()
+    for detector in DETECTOR_WAVELENGTHS_UM:
+        if f"D{detector}" in text or f"DETECTOR{detector}" in text:
+            return detector
+    return None
+
+
+def _detector_for_row(table: Table, row_idx: int) -> int | None:
+    for column in (
+        "energy_bandpassname",
+        "detector",
+        "detector_id",
+        "band",
+        "access_url",
+    ):
+        if column in table.colnames:
+            detector = _detector_number(table[column][row_idx])
+            if detector is not None:
+                return detector
+    return None
+
+
+def available_detectors_for_date(table: Table, observation_date: date) -> list[dict]:
+    """Return detector metadata for the selected date, without downloading FITS files."""
     on_date = _rows_on_date(table, observation_date)
+    detectors = sorted(
+        {_detector_for_row(table, int(row_idx)) for row_idx in on_date} - {None}
+    )
+    return [
+        {
+            "detector": detector,
+            "wavelengthMinUm": DETECTOR_WAVELENGTHS_UM[detector][0],
+            "wavelengthMaxUm": DETECTOR_WAVELENGTHS_UM[detector][1],
+        }
+        for detector in detectors
+    ]
+
+
+def _rows_for_detector(
+    table: Table, observation_date: date, detector: int | None
+) -> np.ndarray:
+    on_date = _rows_on_date(table, observation_date)
+    if on_date.size == 0:
+        return on_date
+    if detector is None:
+        return on_date
+    return np.array(
+        [row_idx for row_idx in on_date if _detector_for_row(table, int(row_idx)) == detector],
+        dtype=int,
+    )
+
+
+def select_image_url_for_date(
+    table: Table, observation_date: date, detector: int | None = None
+) -> str | None:
+    """Return the earliest detector file for a date, defaulting to the first detector."""
+    if detector is None:
+        available = available_detectors_for_date(table, observation_date)
+        detector = available[0]["detector"] if available else None
+    on_date = _rows_for_detector(table, observation_date, detector)
     if on_date.size == 0:
         return None
     t_min = np.ma.filled(np.ma.asarray(table["t_min"], dtype=float), np.nan)
@@ -64,66 +140,39 @@ def list_frames_for_date(
         return []
 
     t_min = np.ma.filled(np.ma.asarray(table["t_min"], dtype=float), np.nan)
-    ordered = on_date[np.argsort(t_min[on_date])]
-    times = Time(t_min[ordered], format="mjd", scale="utc").to_datetime()
-
     frames = []
-    for idx, row_idx in enumerate(ordered):
-        dt = times[idx]
+    for detector_info in available_detectors_for_date(table, observation_date):
+        detector = detector_info["detector"]
+        detector_rows = _rows_for_detector(table, observation_date, detector)
+        if detector_rows.size == 0:
+            continue
+        row_idx = detector_rows[np.argmin(t_min[detector_rows])]
+        dt = Time(t_min[row_idx], format="mjd", scale="utc").to_datetime()
         frames.append(
             {
-                "id": f"spherex-{row_idx}",
+                "id": f"spherex-{row_idx}-d{detector}",
                 "timestamp": dt.strftime("%H:%MZ"),
-                "band": "IR",
+                "band": detector,
+                "detector": detector,
+                **detector_info,
                 "filtered": False,
                 "visible": True,
                 "imageUrl": (
                     f"/api/frames/image?ra={ra_deg}&dec={dec_deg}"
                     f"&fieldSizeDeg={size_deg}&observationDate={observation_date.isoformat()}"
+                    f"&detector={detector}"
                 ),
             }
         )
     return frames
 
 
-def _build_cutout_url(fits_url: str, ra_deg: float, dec_deg: float, size_deg: float) -> str:
-    if not fits_url.startswith(("http://", "https://")):
-        return fits_url
-    sep = "&" if "?" in fits_url else "?"
-    return f"{fits_url}{sep}center={ra_deg},{dec_deg}d&size={size_deg}d"
-
-
-def _download_image_data(
-    fits_url: str,
-    ra_deg: float = 0.0,
-    dec_deg: float = 0.0,
-    size_deg: float = 0.05,
-    subtract_zodi: bool = True,
-    mask_bad_pixels: bool = True,
-) -> np.ndarray:
-    target = _build_cutout_url(fits_url, ra_deg, dec_deg, size_deg)
-    with fits.open(target, memmap=False, cache=False) as hdul:
-        ext = "IMAGE" if "IMAGE" in hdul else 1
-        image_data = np.array(hdul[ext].data, dtype=np.float32)
-
-        if subtract_zodi and "ZODI" in hdul:
-            zodi_data = np.array(hdul["ZODI"].data, dtype=np.float32)
-            image_data = image_data - zodi_data
-
-        if mask_bad_pixels and "FLAGS" in hdul:
-            flags_data = np.asarray(hdul["FLAGS"].data, dtype=np.uint32)
-            image_data[(flags_data & BAD_PIXEL_MASK) != 0] = np.nan
-
-    finite = np.isfinite(image_data)
-    if not np.any(finite):
-        return np.zeros_like(image_data, dtype=np.float32)
-
-    median_val = float(np.nanmedian(image_data[finite]))
-    return np.nan_to_num(image_data, nan=median_val)
-
-
-def _find_image_url(ra_deg: float, dec_deg: float, observation_date: date) -> str:
-    url = select_image_url_for_date(search_images(ra_deg, dec_deg), observation_date)
+def _find_image_url(
+    ra_deg: float, dec_deg: float, observation_date: date, detector: int | None = None
+) -> str:
+    url = select_image_url_for_date(
+        search_images(ra_deg, dec_deg), observation_date, detector
+    )
     if url is None:
         raise ImageNotFoundError(
             f"No image found at these coordinates on {observation_date.isoformat()}."
@@ -132,42 +181,99 @@ def _find_image_url(ra_deg: float, dec_deg: float, observation_date: date) -> st
 
 
 def _render_png(
-    fits_url: str, ra_deg: float = 0.0, dec_deg: float = 0.0, size_deg: float = 0.05
+    fits_url: str,
+    ra_deg: float = 0.0,
+    dec_deg: float = 0.0,
+    size_deg: float = 0.05,
+    color: str = "magma",
+    bands: tuple[int, ...] | None = None,
+    geometry_key=None,
 ) -> bytes:
     try:
-        data = with_retries(
-            lambda: _download_image_data(fits_url, ra_deg, dec_deg, size_deg),
-            (OSError,),
-            "Image download",
+        coords = {"ra": ra_deg, "dec": dec_deg}
+        if bands:
+            coords["sources"] = {band: fits_url for band in bands}
+        else:
+            coords["source"] = fits_url
+        return render_image_png(
+            coords,
+            color=color,
+            bands=bands,
+            size=None,
+            image_loader=_render_loader(ra_deg, dec_deg, size_deg, geometry_key),
         )
-    except OSError as exc:
+    except (OSError, RemoteFitsError) as exc:
         raise ArchiveUnavailableError("Image download failed.") from exc
 
-    if np.nanmin(data) == np.nanmax(data):
-        scaled = np.zeros_like(data, dtype=np.float32)
-    else:
-        norm = ImageNormalize(
-            data,
-            interval=AsymmetricPercentileInterval(1.0, 99.5),
-            stretch=AsinhStretch(a=0.05),
-        )
-        scaled = np.clip(norm(data), 0.0, 1.0)
 
-    fig = Figure(figsize=(FIGURE_SIZE_IN, FIGURE_SIZE_IN), dpi=FIGURE_DPI, facecolor="black")
-    ax = fig.add_axes((0, 0, 1, 1))
-    ax.imshow(scaled, origin="lower", cmap="magma", vmin=0.0, vmax=1.0)
-    ax.axis("off")
+def _render_loader(ra_deg, dec_deg, size_deg, geometry_key):
+    def load(source):
+        image_data, wcs = _download_render_image(source, ra_deg, dec_deg, size_deg)
+        if geometry_key is not None:
+            remember_frame_geometry(geometry_key, image_data, wcs)
+        return image_data, wcs
 
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=FIGURE_DPI)
-    return buf.getvalue()
+    return load
 
 
-def get_sky_image_png(ra_deg, dec_deg, observation_date, size_deg=0.05) -> bytes:
-    key = (round(ra_deg, 5), round(dec_deg, 5), observation_date, size_deg)
+def _download_render_image(fits_url, ra_deg, dec_deg, size_deg):
+    key = (fits_url, round(ra_deg, 5), round(dec_deg, 5), size_deg)
+    return FITS_CACHE.get_or_compute(
+        key, lambda: _download_fits_image(fits_url, ra_deg, dec_deg, size_deg)
+    )
+
+
+def get_sky_image_png(
+    ra_deg,
+    dec_deg,
+    observation_date,
+    size_deg=0.05,
+    color="magma",
+    bands: tuple[int, ...] | None = None,
+    detectors: tuple[int, ...] | None = None,
+) -> bytes:
+    requested_detectors = detectors if detectors is not None else bands
+    key = (
+        round(ra_deg, 5), round(dec_deg, 5), observation_date, size_deg, color,
+        requested_detectors,
+    )
 
     def compute():
+        geometry_key = frame_geometry_key(ra_deg, dec_deg, observation_date, size_deg)
+        table = search_images(ra_deg, dec_deg)
+        selected_detectors = requested_detectors
+        if detectors is None and len(requested_detectors or ()) == 1:
+            available = available_detectors_for_date(table, observation_date)
+            if available:
+                selected_detectors = (available[0]["detector"],)
+                if selected_detectors[0] != requested_detectors[0]:
+                    logger.info(
+                        "Ignoring legacy band %d on %s; using first detector %d.",
+                        requested_detectors[0],
+                        observation_date.isoformat(),
+                        selected_detectors[0],
+                    )
+        if selected_detectors:
+            sources = {
+                detector: select_image_url_for_date(table, observation_date, detector)
+                for detector in selected_detectors
+            }
+            if any(url is None for url in sources.values()):
+                raise ImageNotFoundError(
+                    f"No requested detector image found on {observation_date.isoformat()}."
+                )
+            coords = {"ra": ra_deg, "dec": dec_deg, "sources": sources}
+            try:
+                return render_image_png(
+                    coords,
+                    color=color,
+                    bands=selected_detectors,
+                    size=None,
+                    image_loader=_render_loader(ra_deg, dec_deg, size_deg, geometry_key),
+                )
+            except (OSError, RemoteFitsError) as exc:
+                raise ArchiveUnavailableError("Image download failed.") from exc
         fits_url = _find_image_url(ra_deg, dec_deg, observation_date)
-        return _render_png(fits_url, ra_deg, dec_deg, size_deg)
+        return _render_png(fits_url, ra_deg, dec_deg, size_deg, color, geometry_key=geometry_key)
 
     return PNG_CACHE.get_or_compute(key, compute)

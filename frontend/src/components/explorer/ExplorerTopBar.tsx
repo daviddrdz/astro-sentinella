@@ -2,8 +2,7 @@ import { SiGithub } from "@icons-pack/react-simple-icons";
 import {
   ArrowLeft,
   BookOpen,
-  GitMerge,
-  Layers,
+  // GitMerge,
   Menu,
   Redo2,
   Telescope,
@@ -17,16 +16,14 @@ import type { QueryParams } from "../../types/portal";
 interface ExplorerTopBarProps {
   query: QueryParams;
   locale: ExplorerLocale;
-  layerCount: number;
   canUndo: boolean;
   canRedo: boolean;
   onBackToPortal: () => void;
   onUndo: () => void;
   onRedo: () => void;
-  onMergeExport: () => void;
+  onMergeExport?: () => void;
   onOpenDocs: () => void;
   onToggleLocale: () => void;
-  onOpenMobileLayers: () => void;
 }
 
 function formatFieldSizeArcmin(fieldSizeDeg: string): string {
@@ -41,16 +38,13 @@ function formatFieldSizeArcmin(fieldSizeDeg: string): string {
 export function ExplorerTopBar({
   query,
   locale,
-  layerCount,
   canUndo,
   canRedo,
   onBackToPortal,
   onUndo,
   onRedo,
-  onMergeExport,
   onOpenDocs,
   onToggleLocale,
-  onOpenMobileLayers,
 }: ExplorerTopBarProps) {
   const copy = EXPLORER_COPY[locale];
   const arcminLabel = formatFieldSizeArcmin(query.fieldSizeDeg);
@@ -116,6 +110,7 @@ export function ExplorerTopBar({
 
         <div className="mx-1 h-4 w-px bg-[var(--ae-border-subtle)]" />
 
+        {/* Temporarily hidden from layout: Merge / Export
         <button
           type="button"
           onClick={onMergeExport}
@@ -124,6 +119,7 @@ export function ExplorerTopBar({
           <GitMerge size={EXPLORER_CONFIG.iconSizeSm} aria-hidden="true" />
           <span>{copy.mergeExport}</span>
         </button>
+        */}
 
         <button
           type="button"
@@ -174,15 +170,6 @@ export function ExplorerTopBar({
 
       {/* Mobile actions */}
       <div className="flex items-center gap-1.5 md:hidden">
-        <button
-          type="button"
-          onClick={onOpenMobileLayers}
-          className="btn btn-sm gap-1.5 border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-elevated)] text-[var(--ae-text-primary)]"
-        >
-          <Layers size={EXPLORER_CONFIG.iconSizeSm} aria-hidden="true" />
-          <span>{`${copy.layers} (${layerCount})`}</span>
-        </button>
-
         <div className="dropdown dropdown-end">
           <button
             type="button"
@@ -196,6 +183,7 @@ export function ExplorerTopBar({
             tabIndex={EXPLORER_CONFIG.firstIndex}
             className="menu dropdown-content z-30 mt-2 w-48 rounded-lg border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-elevated)] p-1.5 shadow-xl"
           >
+            {/* Temporarily hidden from layout: Merge / Export
             <li>
               <button type="button" onClick={onMergeExport}>
                 <GitMerge
@@ -205,6 +193,7 @@ export function ExplorerTopBar({
                 {copy.mergeExport}
               </button>
             </li>
+            */}
             <li>
               <button type="button" onClick={onUndo} disabled={!canUndo}>
                 <Undo2 size={EXPLORER_CONFIG.iconSizeSm} aria-hidden="true" />
