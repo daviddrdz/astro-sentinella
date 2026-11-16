@@ -37,3 +37,14 @@ export interface ExplorerSnapshot {
   activeLayerId: string;
   activeFrameIndex: number;
 }
+
+export interface SubtractionResult {
+  id: string;
+  frameA: ExplorerFrame;
+  frameB: ExplorerFrame;
+  createdAt: string;
+  status: "loading" | "ready" | "error";
+  imageUrl?: string;
+  summary?: string;
+  errorMessage?: string;
+}

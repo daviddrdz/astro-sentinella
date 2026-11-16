@@ -4,6 +4,7 @@ import {
   DEFAULT_EXPLORER_LAYERS,
   EXPLORER_CONFIG,
 } from "../../config/explorer";
+import { requestFrameComparison } from "../../services/compareService";
 import { fetchExplorerFrames } from "../../services/framesService";
 import { fetchCoordinateMetadata } from "../../services/metadataService";
 import type {
@@ -13,10 +14,12 @@ import type {
   ExplorerLocale,
   ExplorerSnapshot,
   ExplorerToolId,
+  SubtractionResult,
   TimelineFilterTab,
 } from "../../types/explorer";
 import type { QueryParams } from "../../types/portal";
 import { DocsModal } from "../DocsModal";
+import { CompareInspector } from "./CompareInspector";
 import { ExplorerCanvas } from "./ExplorerCanvas";
 import { ExplorerTimeline } from "./ExplorerTimeline";
 import { ExplorerToolbar } from "./ExplorerToolbar";
@@ -59,10 +62,20 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
   const [zoomLevel, setZoomLevel] = useState<number>(
     EXPLORER_CONFIG.zoomDefault
   );
+  const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({
+    x: EXPLORER_CONFIG.firstIndex,
+    y: EXPLORER_CONFIG.firstIndex,
+  });
   const [timelineTab, setTimelineTab] = useState<TimelineFilterTab>("all");
   const [bandFilter, setBandFilter] = useState<BandChannelId | "all">("all");
   const [isPlaying, setIsPlaying] = useState(false);
   const [docsOpen, setDocsOpen] = useState(false);
+  const [isCompareSelecting, setIsCompareSelecting] = useState(false);
+  const [compareFrameIds, setCompareFrameIds] = useState<string[]>([]);
+  const [restas, setRestas] = useState<SubtractionResult[]>([]);
+  const [activeSubtractionId, setActiveSubtractionId] = useState<string | null>(
+    null
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -186,12 +199,14 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
     setActiveLayerId(next.activeLayerId);
   };
 
+  /* Temporarily hidden from layout: Layers & Blend Mode
   const handleToggleLayerVisibility = (id: string) => {
     const next = layers.map((layer) =>
       layer.id === id ? { ...layer, visible: !layer.visible } : layer
     );
     pushSnapshot(next, activeLayerId);
   };
+  */
 
   const handleUpdateLayer = (id: string, patch: Partial<ExplorerLayer>) => {
     const next = layers.map((layer) =>
@@ -200,6 +215,7 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
     pushSnapshot(next, activeLayerId);
   };
 
+  /* Temporarily hidden from layout: Layers & Blend Mode
   const handleAddLayer = () => {
     const nextIndex = layers.length + EXPLORER_CONFIG.indexStep;
     const newId = `frm-custom-${nextIndex}`;
@@ -215,6 +231,7 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
     };
     pushSnapshot([newLayer, ...layers], newId);
   };
+  */
 
   const handleMergeVisible = () => {
     const visibleLayers = layers.filter((layer) => layer.visible);
@@ -239,6 +256,10 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
   const handleSelectTool = (tool: ExplorerToolId) => {
     if (tool === "reset") {
       setZoomLevel(EXPLORER_CONFIG.zoomDefault);
+      setPanOffset({
+        x: EXPLORER_CONFIG.firstIndex,
+        y: EXPLORER_CONFIG.firstIndex,
+      });
       setActiveTool("hand");
       return;
     }
@@ -292,6 +313,76 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
   const activeFrame =
     frames.find((frame) => frame.id === activeFrameId) ?? null;
 
+  const selectedCompareFrames = compareFrameIds
+    .map((id) => frames.find((frame) => frame.id === id) ?? null)
+    .filter((frame): frame is ExplorerFrame => frame !== null);
+
+  const activeSubtraction =
+    restas.find((resta) => resta.id === activeSubtractionId) ?? null;
+  const isComparing = restas.some((resta) => resta.status === "loading");
+
+  const handleToggleCompareFrame = (frameId: string) => {
+    setCompareFrameIds((prev) => {
+      if (prev.includes(frameId)) {
+        return prev.filter((id) => id !== frameId);
+      }
+      if (prev.length < EXPLORER_CONFIG.compareMaxFrames) {
+        return [...prev, frameId];
+      }
+      return [prev[EXPLORER_CONFIG.firstIndex], frameId];
+    });
+  };
+
+  const handleSwapCompareFrames = () => {
+    setCompareFrameIds((prev) =>
+      prev.length === EXPLORER_CONFIG.compareMaxFrames
+        ? [prev[EXPLORER_CONFIG.indexStep], prev[EXPLORER_CONFIG.firstIndex]]
+        : prev
+    );
+  };
+
+  const handleCompareFrames = async () => {
+    const frameA = selectedCompareFrames[EXPLORER_CONFIG.firstIndex];
+    const frameB = selectedCompareFrames[EXPLORER_CONFIG.indexStep];
+    if (!frameA || !frameB || isComparing) {
+      return;
+    }
+
+    const restaId = `resta-${Date.now()}-${frameA.id}-${frameB.id}`;
+    const pendingResta: SubtractionResult = {
+      id: restaId,
+      frameA,
+      frameB,
+      createdAt: new Date().toISOString(),
+      status: "loading",
+    };
+
+    setRestas((prev) => [pendingResta, ...prev]);
+    setActiveSubtractionId(restaId);
+    setIsCompareSelecting(false);
+    setCompareFrameIds([]);
+
+    const result = await requestFrameComparison(query, frameA, frameB);
+    setRestas((prev) =>
+      prev.map((item) =>
+        item.id === restaId
+          ? result.ok
+            ? {
+                ...item,
+                status: "ready",
+                imageUrl: result.imageUrl,
+                summary: result.summary,
+              }
+            : {
+                ...item,
+                status: "error",
+                errorMessage: result.errorMessage,
+              }
+          : item
+      )
+    );
+  };
+
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-[var(--ae-bg-canvas)] text-[var(--ae-text-primary)]">
       <ExplorerTopBar
@@ -320,25 +411,48 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
           query={query}
           layers={layers}
           activeFrame={activeFrame}
+          activeSubtraction={activeSubtraction}
           activeTool={activeTool}
           zoomLevel={zoomLevel}
+          panOffset={panOffset}
           locale={locale}
+          onPanChange={setPanOffset}
+          onZoomChange={setZoomLevel}
           onCanvasClick={handleCanvasClick}
         />
 
         <aside
-          aria-label="Layers inspector"
-          className="hidden w-80 shrink-0 border-l border-[var(--ae-border-subtle)] md:block"
+          aria-label="Compare inspector"
+          className="hidden w-80 shrink-0 overflow-y-auto border-l border-[var(--ae-border-subtle)] bg-[var(--ae-bg-base)] md:flex md:flex-col"
         >
           <LayersInspector
             layers={layers}
             activeLayerId={activeLayerId}
             locale={locale}
-            onSelectLayer={setActiveLayerId}
-            onToggleLayerVisibility={handleToggleLayerVisibility}
-            onAddLayer={handleAddLayer}
             onUpdateLayer={handleUpdateLayer}
-            onMergeVisible={handleMergeVisible}
+          />
+          <CompareInspector
+            isCompareSelecting={isCompareSelecting}
+            selectedFrames={selectedCompareFrames}
+            restas={restas}
+            activeSubtractionId={activeSubtractionId}
+            isComparing={isComparing}
+            locale={locale}
+            onStartCompareSelection={() => {
+              setIsCompareSelecting(true);
+              setCompareFrameIds([]);
+            }}
+            onCancelCompareSelection={() => {
+              setIsCompareSelecting(false);
+              setCompareFrameIds([]);
+            }}
+            onRemoveSelectedFrame={(frameId) =>
+              setCompareFrameIds((prev) => prev.filter((id) => id !== frameId))
+            }
+            onSwapFrames={handleSwapCompareFrames}
+            onCompare={handleCompareFrames}
+            onSelectResta={(restaId) => setActiveSubtractionId(restaId)}
+            onExitRestaView={() => setActiveSubtractionId(null)}
           />
         </aside>
       </div>
@@ -349,8 +463,14 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
         timelineTab={timelineTab}
         bandFilter={bandFilter}
         isPlaying={isPlaying}
+        isCompareSelecting={isCompareSelecting}
+        compareFrameIds={compareFrameIds}
         locale={locale}
-        onSelectFrame={setActiveFrameId}
+        onSelectFrame={(frameId) => {
+          setActiveSubtractionId(null);
+          setActiveFrameId(frameId);
+        }}
+        onToggleCompareFrame={handleToggleCompareFrame}
         onChangeTab={setTimelineTab}
         onChangeBandFilter={setBandFilter}
         onTogglePlay={() => setIsPlaying((prev) => !prev)}
