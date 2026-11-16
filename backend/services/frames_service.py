@@ -138,7 +138,7 @@ def list_frames_for_date(
                 "imageUrl": (
                     f"/api/frames/image?ra={ra_deg}&dec={dec_deg}"
                     f"&fieldSizeDeg={size_deg}&observationDate={observation_date.isoformat()}"
-                    f"&detector={detector}&fieldSizeDeg=0.05"
+                    f"&detector={detector}"
                 ),
             }
         )
@@ -236,6 +236,7 @@ def get_sky_image_png(
                     coords,
                     color=color,
                     bands=selected_detectors,
+                    size=None,
                     image_loader=lambda source: _download_render_image(
                         source, ra_deg, dec_deg, size_deg
                     ),
