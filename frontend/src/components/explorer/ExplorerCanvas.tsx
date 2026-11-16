@@ -123,6 +123,7 @@ export function ExplorerCanvas({
   const copy = EXPLORER_COPY[locale];
   const visibleLayers = layers.filter((layer) => layer.visible);
   const primaryLayer = visibleLayers[0] ?? layers[0];
+  const primaryTint = primaryLayer?.tint ?? "grey";
   const primaryOpacity = primaryLayer
     ? primaryLayer.opacity / EXPLORER_CONFIG.opacityMax
     : 1;
@@ -253,12 +254,15 @@ export function ExplorerCanvas({
                 fieldSizeDeg: String(fieldDeg),
                 observationDate: obsDateForTiles,
               });
-              imageUrl = `${EXPLORER_CONFIG.framesEndpoint}/image?${params.toString()}`;
+              imageUrl = withColor(
+                `${EXPLORER_CONFIG.framesEndpoint}/image?${params.toString()}`,
+                primaryTint
+              );
             }
             const key = `${col}:${row}`;
             tiles.push({
               key,
-              statusKey: `${key}:${obsDateForTiles}`,
+              statusKey: `${key}:${obsDateForTiles}:${primaryTint}`,
               col,
               row,
               raDisplay,
