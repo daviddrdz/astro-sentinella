@@ -82,7 +82,7 @@ describe("ExplorerView spectrum tool", () => {
     vi.restoreAllMocks();
   });
 
-  it("maps a click to image fractions and shows the chunk spectrum", async () => {
+  it("maps a click to image fractions and shows the spectrum", async () => {
     const fetchMock = mockBackend(
       () => new Response(JSON.stringify(SPECTRUM), { status: 200 })
     );
@@ -132,7 +132,7 @@ describe("ExplorerView spectrum tool", () => {
     fireEvent.click(screen.getByRole("button", { name: "Close spectrum" }));
     expect(screen.queryByTestId("chunk-overlay")).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("complementary", { name: "Chunk spectrum" })
+      screen.queryByRole("complementary", { name: "Spectrum" })
     ).not.toBeInTheDocument();
   });
 });
