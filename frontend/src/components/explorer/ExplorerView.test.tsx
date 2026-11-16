@@ -25,15 +25,13 @@ describe("ExplorerView", () => {
     expect(
       screen.getByText("05h 35m 17s | -05° 23' 28\" | 30 arcmin | 2026-10-12")
     ).toBeInTheDocument();
-    // Temporarily hidden from layout: Layers inspector
-    // expect(screen.getByRole("heading", { name: "Layers" })).toBeInTheDocument();
-    // expect(screen.getByText("FRM-02 | 2")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Layers" })).toBeInTheDocument();
+    expect(screen.getByText("FRM-02 | 2")).toBeInTheDocument();
     const timeline = screen.getByRole("region", { name: "Timeline" });
     expect(timeline).toBeInTheDocument();
     expect(within(timeline).getByText("18:40Z | 1")).toBeInTheDocument();
   });
 
-  /* Temporarily hidden from layout: Layers inspector
   it("supports layer visibility toggle, undo/redo, and adding a layer", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(null, { status: 404 })
@@ -64,7 +62,6 @@ describe("ExplorerView", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
     expect(screen.getByText("FRM-03 | 1")).toBeInTheDocument();
   });
-  */
 
   it("filters timeline frames by tab and band, and steps playback", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
@@ -103,8 +100,7 @@ describe("ExplorerView", () => {
     render(<ExplorerView query={SAMPLE_QUERY} onBackToPortal={vi.fn()} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Toggle language" }));
-    // Temporarily hidden from layout: Layers inspector
-    // expect(screen.getByRole("heading", { name: "Capas" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Capas" })).toBeInTheDocument();
     expect(screen.getByText("Línea de tiempo")).toBeInTheDocument();
   });
 });
