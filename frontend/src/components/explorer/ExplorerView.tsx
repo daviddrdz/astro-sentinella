@@ -503,7 +503,17 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
     setIsCompareSelecting(false);
     setCompareFrameIds([]);
 
-    const result = await requestFrameComparison(query, frameA, frameB);
+    // Subtract the detector currently selected in the layers inspector.
+    const detector =
+      layers.find((layer) => layer.id === activeLayerId)?.band ??
+      frameA.detector ??
+      frameA.band;
+    const result = await requestFrameComparison(
+      query,
+      frameA,
+      frameB,
+      detector
+    );
     setRestas((prev) =>
       prev.map((item) =>
         item.id === restaId

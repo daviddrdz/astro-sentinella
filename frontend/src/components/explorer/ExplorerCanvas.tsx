@@ -431,10 +431,7 @@ export function ExplorerCanvas({
                     })()}
                   </div>
                 ) : (
-                  <div
-                    aria-hidden="true"
-                    className="h-full w-full"
-                  />
+                  <div aria-hidden="true" className="h-full w-full" />
                 )}
               </div>
             );
