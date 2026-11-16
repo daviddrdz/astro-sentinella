@@ -1,13 +1,14 @@
-import { Eye, EyeOff, GitMerge, Plus } from "lucide-react";
+// import { Eye, EyeOff, GitMerge, Plus } from "lucide-react";
 import {
-  BLEND_MODES,
+  BAND_CHANNELS,
+  // BLEND_MODES,
   CHANNEL_TINTS,
   EXPLORER_CONFIG,
   EXPLORER_COPY,
 } from "../../config/explorer";
 import type { BandChannelOption } from "../../config/explorer";
 import type {
-  BlendMode,
+  // BlendMode,
   ChannelTintId,
   ExplorerLayer,
   ExplorerLocale,
@@ -18,11 +19,11 @@ interface LayersInspectorProps {
   availableChannels: readonly BandChannelOption[];
   activeLayerId: string;
   locale: ExplorerLocale;
-  onSelectLayer: (id: string) => void;
-  onToggleLayerVisibility: (id: string) => void;
-  onAddLayer: () => void;
+  onSelectLayer?: (id: string) => void;
+  onToggleLayerVisibility?: (id: string) => void;
+  onAddLayer?: () => void;
   onUpdateLayer: (id: string, patch: Partial<ExplorerLayer>) => void;
-  onMergeVisible: () => void;
+  onMergeVisible?: () => void;
 }
 
 export function LayersInspector({
@@ -30,11 +31,7 @@ export function LayersInspector({
   availableChannels,
   activeLayerId,
   locale,
-  onSelectLayer,
-  onToggleLayerVisibility,
-  onAddLayer,
   onUpdateLayer,
-  onMergeVisible,
 }: LayersInspectorProps) {
   const copy = EXPLORER_COPY[locale];
   const activeLayer =
@@ -42,8 +39,8 @@ export function LayersInspector({
     layers[EXPLORER_CONFIG.firstIndex];
 
   return (
-    <div className="flex h-full flex-col bg-[var(--ae-bg-base)]">
-      {/* Header */}
+    <div className="flex flex-col bg-[var(--ae-bg-base)]">
+      {/* Temporarily hidden from layout: Layers header & list
       <div className="flex items-center justify-between border-b border-[var(--ae-border-subtle)] px-4 py-3">
         <h2 className="text-sm font-semibold tracking-tight text-[var(--ae-text-primary)]">
           {copy.layers}
@@ -54,11 +51,10 @@ export function LayersInspector({
           className="btn btn-ghost btn-xs gap-1 font-medium text-[var(--ae-primary)] hover:bg-[var(--ae-primary)]/10"
         >
           <Plus size={EXPLORER_CONFIG.iconSizeSm} aria-hidden="true" />
-          <span>{copy.addLayer.replace(/^\+\s*/, "")}</span>
+          <span>{copy.addLayer}</span>
         </button>
       </div>
 
-      {/* Layers list */}
       <div className="flex-1 space-y-1.5 overflow-y-auto p-3">
         {layers.length === EXPLORER_CONFIG.firstIndex ? (
           <p className="py-6 text-center text-sm text-[var(--ae-text-muted)]">
@@ -119,11 +115,13 @@ export function LayersInspector({
           })
         )}
       </div>
+      */}
 
-      {/* Active Layer Controls */}
+      {/* Active Layer Controls (Band/Channel, Tint, Opacity) */}
       {activeLayer && (
-        <div className="space-y-3 border-t border-[var(--ae-border-subtle)] bg-[var(--ae-bg-elevated)]/40 p-4">
+        <div className="space-y-3 border-b border-[var(--ae-border-subtle)] bg-[var(--ae-bg-elevated)]/40 p-4">
           <div className="grid grid-cols-1 gap-2.5">
+            {/* Temporarily hidden from layout: Blend Mode
             <label className="block">
               <span className="mb-1 block text-sm font-medium text-[var(--ae-text-muted)]">
                 {copy.blendMode}
@@ -145,6 +143,7 @@ export function LayersInspector({
                 ))}
               </select>
             </label>
+            */}
 
             <label className="block">
               <span className="mb-1 block text-sm font-medium text-[var(--ae-text-muted)]">
@@ -165,7 +164,9 @@ export function LayersInspector({
                       checked={activeLayer.bands.includes(channel.id)}
                       onChange={() => {
                         const bands = activeLayer.bands.includes(channel.id)
-                          ? activeLayer.bands.filter((band) => band !== channel.id)
+                          ? activeLayer.bands.filter(
+                              (band) => band !== channel.id
+                            )
                           : [...activeLayer.bands, channel.id].sort(
                               (a, b) => a - b
                             );
@@ -230,6 +231,7 @@ export function LayersInspector({
               />
             </label>
 
+            {/* Temporarily hidden from layout: Merge Visible
             <button
               type="button"
               onClick={onMergeVisible}
@@ -238,6 +240,7 @@ export function LayersInspector({
               <GitMerge size={EXPLORER_CONFIG.iconSizeSm} aria-hidden="true" />
               <span>{copy.mergeVisible}</span>
             </button>
+            */}
           </div>
         </div>
       )}

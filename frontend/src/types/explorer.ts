@@ -8,12 +8,7 @@ export type BlendMode = "Normal" | "Subtract" | "Screen" | "Add";
 export type BandChannelId = 1 | 2 | 3 | 4 | 5 | 6;
 
 export type ChannelTintId =
-  | "grey"
-  | "viridis"
-  | "magma"
-  | "inferno"
-  | "cividis"
-  | "cubehelix";
+  "grey" | "viridis" | "magma" | "inferno" | "cividis" | "cubehelix";
 
 export type TimelineFilterTab = "all" | "visible" | "filtered";
 
@@ -44,4 +39,15 @@ export interface ExplorerSnapshot {
   layers: ExplorerLayer[];
   activeLayerId: string;
   activeFrameIndex: number;
+}
+
+export interface SubtractionResult {
+  id: string;
+  frameA: ExplorerFrame;
+  frameB: ExplorerFrame;
+  createdAt: string;
+  status: "loading" | "ready" | "error";
+  imageUrl?: string;
+  summary?: string;
+  errorMessage?: string;
 }

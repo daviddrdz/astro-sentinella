@@ -11,6 +11,8 @@ import type {
 
 export const EXPLORER_CONFIG = {
   framesEndpoint: "/api/frames",
+  compareEndpoint: "/api/frames/compare",
+  compareMaxFrames: 2,
   defaultArcminPerDeg: 60,
   defaultScaleArcmin: 5,
   playbackIntervalMs: 1200,
@@ -22,6 +24,8 @@ export const EXPLORER_CONFIG = {
   zoomMax: 4,
   zoomStep: 0.25,
   zoomDefault: 1,
+  dragThresholdPx: 4,
+  wheelZoomSensitivity: 0.0015,
   indexStep: 1,
   firstIndex: 0,
   maxUndoHistory: 30,
@@ -135,6 +139,26 @@ export const EXPLORER_COPY: Record<
     loadingFrame: string;
     frameUnavailable: string;
     retryFrame: string;
+    compareTitle: string;
+    compareHint: string;
+    frameALabel: string;
+    frameBLabel: string;
+    selectFromTimeline: string;
+    compareAction: string;
+    comparing: string;
+    clearSelection: string;
+    swapFrames: string;
+    restasTitle: string;
+    noRestas: string;
+    viewResult: string;
+    viewingResult: string;
+    backToFrames: string;
+    compareFailed: string;
+    pickForCompare: string;
+    comparingSkeleton: string;
+    startCompare: string;
+    cancelCompare: string;
+    compareSelectingHint: string;
   }
 > = {
   en: {
@@ -166,6 +190,26 @@ export const EXPLORER_COPY: Record<
     frameUnavailable:
       "Frame unavailable or rate-limited. Wait a moment and retry.",
     retryFrame: "Retry",
+    compareTitle: "Compare",
+    compareHint: "Select 2 frames from the timeline to subtract.",
+    frameALabel: "Frame A",
+    frameBLabel: "Frame B",
+    selectFromTimeline: "Select from timeline",
+    compareAction: "Compare",
+    comparing: "Comparing...",
+    clearSelection: "Clear",
+    swapFrames: "Swap",
+    restasTitle: "Restas",
+    noRestas: "No subtractions yet.",
+    viewResult: "View",
+    viewingResult: "Viewing",
+    backToFrames: "Back to frame",
+    compareFailed: "Compare endpoint is not available yet.",
+    pickForCompare: "Select for compare",
+    comparingSkeleton: "Computing sector subtraction...",
+    startCompare: "Compare 2 frames",
+    cancelCompare: "Cancel",
+    compareSelectingHint: "Click 2 frames in the timeline to select them.",
   },
   es: {
     backToPortal: "Volver al Portal",
@@ -196,6 +240,27 @@ export const EXPLORER_COPY: Record<
     frameUnavailable:
       "Fotograma no disponible o límite de peticiones alcanzado.",
     retryFrame: "Reintentar",
+    compareTitle: "Comparar",
+    compareHint: "Selecciona 2 fotogramas en la línea de tiempo para restar.",
+    frameALabel: "Fotograma A",
+    frameBLabel: "Fotograma B",
+    selectFromTimeline: "Selecciona en la línea de tiempo",
+    compareAction: "Comparar",
+    comparing: "Comparando...",
+    clearSelection: "Limpiar",
+    swapFrames: "Intercambiar",
+    restasTitle: "Restas",
+    noRestas: "Aún no hay restas.",
+    viewResult: "Ver",
+    viewingResult: "Viendo",
+    backToFrames: "Volver al fotograma",
+    compareFailed: "El endpoint de comparación aún no está disponible.",
+    pickForCompare: "Seleccionar para comparar",
+    comparingSkeleton: "Calculando resta entre sectores...",
+    startCompare: "Comparar 2 fotogramas",
+    cancelCompare: "Cancelar",
+    compareSelectingHint:
+      "Haz clic en 2 fotogramas de la línea de tiempo para seleccionarlos.",
   },
 };
 
