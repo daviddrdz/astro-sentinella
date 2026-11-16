@@ -1297,8 +1297,6 @@ export function Explorer3DCanvas({
     );
   };
 
-  const starCountDisplay = hygData ? hygData.stars.length.toLocaleString() : "";
-
   return (
     <div
       className="relative flex-1 overflow-hidden bg-[#030712] select-none"
@@ -1398,21 +1396,12 @@ export function Explorer3DCanvas({
           )}
         </div>
 
-        <div className="flex items-center gap-2 rounded-[var(--ae-radius-md)] border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-surface)]/85 px-3 py-1 text-[length:var(--ae-text-sm)] text-[var(--ae-text-muted)] backdrop-blur-md">
-          {loadingStars ? (
-            <>
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--ae-accent-primary)]" />
-              <span>{copy.loadingCatalog}</span>
-            </>
-          ) : (
-            <span>
-              {copy.catalogAttribution}
-              {starCountDisplay
-                ? ` · ${starCountDisplay} ${copy.starsLoaded}`
-                : ""}
-            </span>
-          )}
-        </div>
+        {loadingStars && (
+          <div className="flex items-center gap-2 rounded-[var(--ae-radius-md)] border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-surface)]/85 px-3 py-1 text-[length:var(--ae-text-sm)] text-[var(--ae-text-muted)] backdrop-blur-md">
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--ae-accent-primary)]" />
+            <span>{copy.loadingCatalog}</span>
+          </div>
+        )}
       </div>
 
       <div
@@ -1519,12 +1508,21 @@ export function Explorer3DCanvas({
             );
           })}
         </div>
-        <div className="text-xs text-[var(--ae-text-muted)]">
-          {copy.scaleSubtitles[scale]} · {copy.dragHint} · {copy.scrollHint}
-          {(scale === "sky-view" || scale === "neighborhood") &&
-            ` · ${copy.starClickHint}`}
+        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-[var(--ae-text-muted)]">
+          <span>{copy.scaleSubtitles[scale]}</span>
+          <span>{copy.dragHint}</span>
+          <span>{copy.scrollHint}</span>
+          {(scale === "sky-view" || scale === "neighborhood") && (
+            <span>{copy.starClickHint}</span>
+          )}
         </div>
       </div>
+
+      {!loadingStars && (
+        <div className="pointer-events-none absolute bottom-4 left-4 text-xs text-[var(--ae-text-muted)] opacity-75">
+          {copy.catalogAttribution}
+        </div>
+      )}
     </div>
   );
 }
