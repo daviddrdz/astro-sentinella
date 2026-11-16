@@ -191,6 +191,7 @@ export const EXPLORER_COPY: Record<
     spectrumDelta: string;
     rulerHint: string;
     rulerSeparation: string;
+    sectorNotFoundForDate: string;
   }
 > = {
   en: {
@@ -269,6 +270,7 @@ export const EXPLORER_COPY: Record<
     spectrumDelta: "Δ Peak (B - A)",
     rulerHint: "Click two points on the image to measure angular separation.",
     rulerSeparation: "Separation",
+    sectorNotFoundForDate: "No frame on this date",
   },
   es: {
     backToPortal: "Volver al Portal",
@@ -346,6 +348,7 @@ export const EXPLORER_COPY: Record<
     spectrumDelta: "Δ Pico (B - A)",
     rulerHint: "Haz clic en dos puntos para medir la separación angular.",
     rulerSeparation: "Separación",
+    sectorNotFoundForDate: "Sin fotograma en esta fecha",
   },
 };
 
