@@ -72,12 +72,12 @@ export interface BandChannelOption {
 }
 
 export const BAND_CHANNELS: readonly BandChannelOption[] = [
-  { id: 1, label: "Band 1 (0.75 – 1.10 µm) — Optical / Near-IR" },
-  { id: 2, label: "Band 2 (1.10 – 1.58 µm) — Near-Infrared" },
-  { id: 3, label: "Band 3 (1.58 – 2.14 µm) — Near-Infrared" },
-  { id: 4, label: "Band 4 (2.14 – 2.82 µm) — Mid-Near Infrared" },
-  { id: 5, label: "Band 5 (2.82 – 3.80 µm) — Infrared" },
-  { id: 6, label: "Band 6 (3.80 – 5.00 µm) — Deep Infrared" },
+  { id: 1, label: "Detector 1 (0.75 – 1.11 µm)" },
+  { id: 2, label: "Detector 2 (1.11 – 1.66 µm)" },
+  { id: 3, label: "Detector 3 (1.64 – 2.42 µm)" },
+  { id: 4, label: "Detector 4 (2.42 – 3.18 µm)" },
+  { id: 5, label: "Detector 5 (3.18 – 4.41 µm)" },
+  { id: 6, label: "Detector 6 (4.41 – 5.00 µm)" },
 ];
 
 export interface ChannelTintOption {

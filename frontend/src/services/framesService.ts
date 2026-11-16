@@ -14,7 +14,8 @@ function isValidFrame(item: unknown): item is ExplorerFrame {
   return (
     typeof candidate.id === "string" &&
     typeof candidate.timestamp === "string" &&
-    typeof candidate.band === "string" &&
+    typeof candidate.band === "number" &&
+    Number.isInteger(candidate.band) &&
     VALID_BANDS.has(candidate.band as BandChannelId) &&
     typeof candidate.filtered === "boolean" &&
     typeof candidate.visible === "boolean"

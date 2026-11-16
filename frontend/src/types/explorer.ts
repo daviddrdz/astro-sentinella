@@ -35,6 +35,9 @@ export interface ExplorerFrame {
   filtered: boolean;
   visible: boolean;
   imageUrl?: string;
+  detector?: BandChannelId;
+  wavelengthMinUm?: number;
+  wavelengthMaxUm?: number;
 }
 
 export interface ExplorerSnapshot {

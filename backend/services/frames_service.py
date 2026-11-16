@@ -138,7 +138,7 @@ def list_frames_for_date(
                 "imageUrl": (
                     f"/api/frames/image?ra={ra_deg}&dec={dec_deg}"
                     f"&fieldSizeDeg={size_deg}&observationDate={observation_date.isoformat()}"
-                    f"&detector={detector}"
+                    f"&detector={detector}&fieldSizeDeg=0.05"
                 ),
             }
         )
