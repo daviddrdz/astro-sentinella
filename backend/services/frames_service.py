@@ -211,14 +211,13 @@ def get_sky_image_png(
         table = search_images(ra_deg, dec_deg)
         selected_detectors = requested_detectors
         if detectors is None and len(requested_detectors or ()) == 1:
-            requested_detector = requested_detectors[0]
-            if select_image_url_for_date(table, observation_date, requested_detector) is None:
-                available = available_detectors_for_date(table, observation_date)
-                if available:
-                    selected_detectors = (available[0]["detector"],)
+            available = available_detectors_for_date(table, observation_date)
+            if available:
+                selected_detectors = (available[0]["detector"],)
+                if selected_detectors[0] != requested_detectors[0]:
                     logger.info(
-                        "Legacy band %d is unavailable on %s; using detector %d.",
-                        requested_detector,
+                        "Ignoring legacy band %d on %s; using first detector %d.",
+                        requested_detectors[0],
                         observation_date.isoformat(),
                         selected_detectors[0],
                     )
