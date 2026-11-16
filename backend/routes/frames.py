@@ -8,6 +8,7 @@ from services.frames_service import (
     list_frames_for_date,
 )
 from services.irsa_archive import ArchiveUnavailableError
+from services.spectrum_service import prefetch_field_cube
 
 frames_bp = Blueprint("frames", __name__, url_prefix="/api/frames")
 
@@ -58,6 +59,9 @@ def frame_image():
     except ArchiveUnavailableError:
         current_app.logger.exception("Frame image lookup failed")
         return error_response(502, "image_source_unavailable", "The image archive is unavailable.")
+
+    # The user is likely to click this frame next; warm its spectral cube now.
+    prefetch_field_cube(query.ra_deg, query.dec_deg, query.field_size_deg)
 
     resp = Response(png_bytes, mimetype="image/png")
     resp.headers["Cache-Control"] = "public, max-age=3600"

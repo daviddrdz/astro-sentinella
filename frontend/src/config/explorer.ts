@@ -11,6 +11,10 @@ import type {
 
 export const EXPLORER_CONFIG = {
   framesEndpoint: "/api/frames",
+  spectrumEndpoint: "/api/frames/spectrum",
+  compareEndpoint: "/api/frames/compare",
+  compareMaxFrames: 2,
+  detectorRangeDecimals: 2,
   defaultArcminPerDeg: 60,
   defaultScaleArcmin: 5,
   playbackIntervalMs: 1200,
@@ -22,6 +26,8 @@ export const EXPLORER_CONFIG = {
   zoomMax: 4,
   zoomStep: 0.25,
   zoomDefault: 1,
+  dragThresholdPx: 4,
+  wheelZoomSensitivity: 0.0015,
   indexStep: 1,
   firstIndex: 0,
   maxUndoHistory: 30,
@@ -52,6 +58,11 @@ export const EXPLORER_TOOLS: readonly ToolOption[] = [
   },
   { id: "region", mobileVisible: false, label: { en: "Region", es: "Región" } },
   { id: "ruler", mobileVisible: false, label: { en: "Ruler", es: "Regla" } },
+  {
+    id: "spectrum",
+    mobileVisible: true,
+    label: { en: "Spectrum", es: "Espectro" },
+  },
   {
     id: "reset",
     mobileVisible: false,
@@ -135,6 +146,37 @@ export const EXPLORER_COPY: Record<
     loadingFrame: string;
     frameUnavailable: string;
     retryFrame: string;
+    spectrumTitle: string;
+    spectrumHint: string;
+    spectrumLoading: string;
+    spectrumError: string;
+    spectrumNoCoverage: string;
+    spectrumSourceNote: string;
+    spectrumWavelength: string;
+    spectrumFlux: string;
+    spectrumChunk: string;
+    spectrumShowTable: string;
+    spectrumClose: string;
+    compareTitle: string;
+    compareHint: string;
+    frameALabel: string;
+    frameBLabel: string;
+    selectFromTimeline: string;
+    compareAction: string;
+    comparing: string;
+    clearSelection: string;
+    swapFrames: string;
+    restasTitle: string;
+    noRestas: string;
+    viewResult: string;
+    viewingResult: string;
+    backToFrames: string;
+    compareFailed: string;
+    pickForCompare: string;
+    comparingSkeleton: string;
+    startCompare: string;
+    cancelCompare: string;
+    compareSelectingHint: string;
   }
 > = {
   en: {
@@ -166,6 +208,39 @@ export const EXPLORER_COPY: Record<
     frameUnavailable:
       "Frame unavailable or rate-limited. Wait a moment and retry.",
     retryFrame: "Retry",
+    spectrumTitle: "Spectrum",
+    spectrumHint:
+      "Click anywhere on the frame to see the spectrum of that area.",
+    spectrumLoading: "Extracting spectrum from the 102 SPHEREx channels...",
+    spectrumError: "Spectrum unavailable. Try again in a moment.",
+    spectrumNoCoverage: "No SPHEREx mosaic coverage for this area.",
+    spectrumSourceNote:
+      "All-mission SPHEREx mosaic (quick-look, not tied to this date). For science, use the IRSA spectrophotometry tool.",
+    spectrumWavelength: "Wavelength (µm)",
+    spectrumFlux: "Surface brightness",
+    spectrumChunk: "Chunk",
+    spectrumShowTable: "Show data table",
+    spectrumClose: "Close spectrum",
+    compareTitle: "Compare",
+    compareHint: "Select 2 frames from the timeline to subtract.",
+    frameALabel: "Frame A",
+    frameBLabel: "Frame B",
+    selectFromTimeline: "Select from timeline",
+    compareAction: "Compare",
+    comparing: "Comparing...",
+    clearSelection: "Clear",
+    swapFrames: "Swap",
+    restasTitle: "Restas",
+    noRestas: "No subtractions yet.",
+    viewResult: "View",
+    viewingResult: "Viewing",
+    backToFrames: "Back to frame",
+    compareFailed: "Compare endpoint is not available yet.",
+    pickForCompare: "Select for compare",
+    comparingSkeleton: "Computing sector subtraction...",
+    startCompare: "Compare 2 frames",
+    cancelCompare: "Cancel",
+    compareSelectingHint: "Click 2 frames in the timeline to select them.",
   },
   es: {
     backToPortal: "Volver al Portal",
@@ -196,6 +271,39 @@ export const EXPLORER_COPY: Record<
     frameUnavailable:
       "Fotograma no disponible o límite de peticiones alcanzado.",
     retryFrame: "Reintentar",
+    spectrumTitle: "Espectro",
+    spectrumHint: "Haz clic en el frame para ver el espectro de esa zona.",
+    spectrumLoading: "Extrayendo el espectro de los 102 canales SPHEREx...",
+    spectrumError: "Espectro no disponible. Intenta de nuevo en un momento.",
+    spectrumNoCoverage: "El mosaico SPHEREx no cubre esta zona.",
+    spectrumSourceNote:
+      "Mosaico SPHEREx de toda la misión (quick-look, no corresponde a esta fecha). Para ciencia, usa la herramienta de espectrofotometría de IRSA.",
+    spectrumWavelength: "Longitud de onda (µm)",
+    spectrumFlux: "Brillo superficial",
+    spectrumChunk: "Chunk",
+    spectrumShowTable: "Ver tabla de datos",
+    spectrumClose: "Cerrar espectro",
+    compareTitle: "Comparar",
+    compareHint: "Selecciona 2 fotogramas en la línea de tiempo para restar.",
+    frameALabel: "Fotograma A",
+    frameBLabel: "Fotograma B",
+    selectFromTimeline: "Selecciona en la línea de tiempo",
+    compareAction: "Comparar",
+    comparing: "Comparando...",
+    clearSelection: "Limpiar",
+    swapFrames: "Intercambiar",
+    restasTitle: "Restas",
+    noRestas: "Aún no hay restas.",
+    viewResult: "Ver",
+    viewingResult: "Viendo",
+    backToFrames: "Volver al fotograma",
+    compareFailed: "El endpoint de comparación aún no está disponible.",
+    pickForCompare: "Seleccionar para comparar",
+    comparingSkeleton: "Calculando resta entre sectores...",
+    startCompare: "Comparar 2 fotogramas",
+    cancelCompare: "Cancelar",
+    compareSelectingHint:
+      "Haz clic en 2 fotogramas de la línea de tiempo para seleccionarlos.",
   },
 };
 
@@ -280,3 +388,59 @@ export const DEFAULT_EXPLORER_FRAMES: readonly ExplorerFrame[] = [
     visible: true,
   },
 ];
+
+/**
+ * Geometry of the inline spectrum chart (SVG user units). `width` matches the
+ * panel's inner width (--ae-inspector-width minus its 2rem padding) so the
+ * chart renders 1:1 and its --ae-text-sm labels stay at their token size.
+ * Colors, fonts and radii come from styles/tokens.css, never from here.
+ */
+export const SPECTRUM_CHART = {
+  width: 272,
+  height: 208,
+  margin: { top: 26, right: 10, bottom: 44, left: 56 },
+  xTicksUm: [1, 2, 3, 4, 5],
+  xDomainMinUm: 0.7,
+  xDomainMaxUm: 5.1,
+  yTickTarget: 4,
+  yPadRatio: 0.08,
+  yLabelGap: 6,
+  xLabelOffset: 18,
+  axisTitleInset: 4,
+  refLabelGap: 8,
+  refDash: "2 3",
+  lineWidth: 2,
+  markerRadius: 4,
+  markerRing: 2,
+  refLineOpacity: 0.35,
+  crosshairOpacity: 0.6,
+  coordDecimals: 1,
+  wavelengthDecimals: 3,
+  tooltipMinPct: 28,
+  tooltipMaxPct: 72,
+  percent: 100,
+  half: 2,
+  /** Common bright features in SPHEREx spectra, drawn as faint references. */
+  referenceLines: [
+    { um: 1.875, label: "Paα" },
+    { um: 3.3, label: "PAH" },
+    { um: 4.052, label: "Brα" },
+  ],
+} as const;
+
+export const SPECTRUM_FORMAT = {
+  fluxSignificantDigits: 3,
+  fluxExpDigits: 2,
+  fluxSmallAbs: 0.01,
+  fluxLargeAbs: 1e4,
+  niceResiduals: [
+    { atLeast: 7, nice: 10 },
+    { atLeast: 3, nice: 5 },
+    { atLeast: 1.5, nice: 2 },
+  ],
+  niceBase: 10,
+  tickPrecision: 12,
+  clickDecimals: 4,
+  coordDecimals: 4,
+  chunkArcsecDecimals: 0,
+} as const;

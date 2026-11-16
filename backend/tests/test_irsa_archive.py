@@ -17,7 +17,7 @@ def test_search_retries_transient_failures(monkeypatch, no_sleep):
     attempts = []
     table = Table({"t_min": [60800.0]})
 
-    def flaky(ra, dec):
+    def flaky(ra, dec, radius):
         attempts.append(1)
         if len(attempts) < 3:
             raise DALServiceError("502 Proxy Error")
@@ -33,7 +33,7 @@ def test_search_retries_transient_failures(monkeypatch, no_sleep):
 def test_search_gives_up_after_three_retries(monkeypatch, no_sleep):
     attempts = []
 
-    def always_fails(ra, dec):
+    def always_fails(ra, dec, radius):
         attempts.append(1)
         raise DALServiceError("502 Proxy Error")
 
@@ -48,7 +48,7 @@ def test_search_gives_up_after_three_retries(monkeypatch, no_sleep):
 def test_rejected_queries_are_not_retried(monkeypatch, no_sleep):
     attempts = []
 
-    def rejected(ra, dec):
+    def rejected(ra, dec, radius):
         attempts.append(1)
         raise DALQueryError("bad query")
 
