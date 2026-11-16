@@ -2,7 +2,7 @@ import pytest
 
 from app import limiter
 from services.fits_remote import LAYOUT_CACHE
-from services.frames_service import FRAME_GEOMETRY_CACHE, PNG_CACHE
+from services.frames_service import FITS_CACHE, FRAME_GEOMETRY_CACHE, PNG_CACHE
 from services.hips_cube import SCAN_CACHE
 from services.irsa_archive import SEARCH_CACHE
 from services.level2_spectrum import SPECTRUM_CACHE, WAVE_GRID_CACHE, WCS_CACHE
@@ -11,6 +11,7 @@ from services.spectrum_service import FIELD_CUBE_CACHE
 ALL_CACHES = (
     SEARCH_CACHE,
     PNG_CACHE,
+    FITS_CACHE,
     LAYOUT_CACHE,
     SCAN_CACHE,
     SPECTRUM_CACHE,

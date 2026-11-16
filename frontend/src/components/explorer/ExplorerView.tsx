@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  BAND_CHANNELS,
   DEFAULT_EXPLORER_FRAMES,
   DEFAULT_EXPLORER_LAYERS,
   EXPLORER_CONFIG,
   EXPLORER_COPY,
+  type BandChannelOption,
 } from "../../config/explorer";
+import { requestFrameComparison } from "../../services/compareService";
 import { fetchExplorerFrames } from "../../services/framesService";
 import { fetchCoordinateMetadata } from "../../services/metadataService";
 import {
@@ -19,16 +22,18 @@ import type {
   ExplorerSnapshot,
   ExplorerToolId,
   SpectrumState,
+  SubtractionResult,
   TimelineFilterTab,
 } from "../../types/explorer";
 import type { QueryParams } from "../../types/portal";
 import { DocsModal } from "../DocsModal";
+import { CompareInspector } from "./CompareInspector";
 import { ExplorerCanvas } from "./ExplorerCanvas";
 import { ExplorerTimeline } from "./ExplorerTimeline";
 import { ExplorerToolbar } from "./ExplorerToolbar";
 import { ExplorerTopBar } from "./ExplorerTopBar";
 import { SpectrumPanel } from "./SpectrumPanel";
-// import { LayersInspector } from "./LayersInspector";
+import { LayersInspector } from "./LayersInspector";
 
 interface ExplorerViewProps {
   query: QueryParams;
@@ -44,11 +49,58 @@ function getInitialFrameId(frames: readonly ExplorerFrame[]): string | null {
   return preferred?.id ?? frames[EXPLORER_CONFIG.firstIndex]?.id ?? null;
 }
 
+function channelsFromFrames(
+  frames: readonly ExplorerFrame[]
+): BandChannelOption[] {
+  const seen = new Set<BandChannelId>();
+  return frames.reduce<BandChannelOption[]>((channels, frame) => {
+    const detector = frame.detector ?? frame.band;
+    if (seen.has(detector)) {
+      return channels;
+    }
+    seen.add(detector);
+    const fallback = BAND_CHANNELS.find((channel) => channel.id === detector);
+    const min = frame.wavelengthMinUm?.toFixed(
+      EXPLORER_CONFIG.detectorRangeDecimals
+    );
+    const max = frame.wavelengthMaxUm?.toFixed(
+      EXPLORER_CONFIG.detectorRangeDecimals
+    );
+    channels.push({
+      id: detector,
+      label:
+        min && max
+          ? `Detector ${detector} (${min} – ${max} µm)`
+          : (fallback?.label ?? `Detector ${detector}`),
+    });
+    return channels;
+  }, []);
+}
+
+function restrictLayers(
+  layers: ExplorerLayer[],
+  availableChannels: readonly BandChannelOption[]
+): ExplorerLayer[] {
+  if (availableChannels.length === 0) {
+    return layers;
+  }
+  const available = new Set(availableChannels.map((channel) => channel.id));
+  const firstDetector = availableChannels[EXPLORER_CONFIG.firstIndex].id;
+  return layers.map((layer) => {
+    const bands = layer.bands.filter((band) => available.has(band));
+    const selectedBands = bands.length > 0 ? bands : [firstDetector];
+    return { ...layer, bands: selectedBands, band: selectedBands[0] };
+  });
+}
+
 export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
   const [locale, setLocale] = useState<ExplorerLocale>("en");
   const [layers, setLayers] = useState<ExplorerLayer[]>(() =>
     cloneLayers([...DEFAULT_EXPLORER_LAYERS])
   );
+  const [availableChannels, setAvailableChannels] = useState<
+    BandChannelOption[]
+  >(() => [...BAND_CHANNELS]);
   const [activeLayerId, setActiveLayerId] = useState<string>(
     DEFAULT_EXPLORER_LAYERS[EXPLORER_CONFIG.firstIndex]?.id ?? ""
   );
@@ -66,6 +118,10 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
   const [zoomLevel, setZoomLevel] = useState<number>(
     EXPLORER_CONFIG.zoomDefault
   );
+  const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({
+    x: EXPLORER_CONFIG.firstIndex,
+    y: EXPLORER_CONFIG.firstIndex,
+  });
   const [timelineTab, setTimelineTab] = useState<TimelineFilterTab>("all");
   const [bandFilter, setBandFilter] = useState<BandChannelId | "all">("all");
   const [isPlaying, setIsPlaying] = useState(false);
@@ -78,6 +134,12 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
     grid: { rows: number; cols: number } | null;
   }>({ frameId: null, state: { status: "idle" }, grid: null });
   const spectrumAbortRef = useRef<AbortController | null>(null);
+  const [isCompareSelecting, setIsCompareSelecting] = useState(false);
+  const [compareFrameIds, setCompareFrameIds] = useState<string[]>([]);
+  const [restas, setRestas] = useState<SubtractionResult[]>([]);
+  const [activeSubtractionId, setActiveSubtractionId] = useState<string | null>(
+    null
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -87,6 +149,17 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
     ]).then(([metadata, remoteFrames]) => {
       if (controller.signal.aborted) {
         return;
+      }
+
+      if (remoteFrames.length > EXPLORER_CONFIG.firstIndex) {
+        const detectedChannels = channelsFromFrames(remoteFrames);
+        setAvailableChannels(detectedChannels);
+        setLayers((previous) =>
+          restrictLayers(previous, detectedChannels).map((layer) => ({
+            ...layer,
+            bands: [...layer.bands],
+          }))
+        );
       }
 
       if (
@@ -201,7 +274,7 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
     setActiveLayerId(next.activeLayerId);
   };
 
-  /*
+  /* Temporarily hidden from layout: Layers & Blend Mode
   const handleToggleLayerVisibility = (id: string) => {
     const next = layers.map((layer) =>
       layer.id === id ? { ...layer, visible: !layer.visible } : layer
@@ -217,7 +290,7 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
     pushSnapshot(next, activeLayerId);
   };
 
-  /*
+  /* Temporarily hidden from layout: Layers & Blend Mode
   const handleAddLayer = () => {
     const nextIndex = layers.length + EXPLORER_CONFIG.indexStep;
     const newId = `frm-custom-${nextIndex}`;
@@ -231,6 +304,9 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
       tint: "magma",
       bands: [1],
     };
+    const detector = availableChannels[EXPLORER_CONFIG.firstIndex]?.id ?? 1;
+    newLayer.band = detector;
+    newLayer.bands = [detector];
     pushSnapshot([newLayer, ...layers], newId);
   };
   */
@@ -258,6 +334,10 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
   const handleSelectTool = (tool: ExplorerToolId) => {
     if (tool === "reset") {
       setZoomLevel(EXPLORER_CONFIG.zoomDefault);
+      setPanOffset({
+        x: EXPLORER_CONFIG.firstIndex,
+        y: EXPLORER_CONFIG.firstIndex,
+      });
       setActiveTool("hand");
       return;
     }
@@ -374,6 +454,76 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
   const showSpectrumPanel =
     activeTool === "spectrum" || spectrum.status !== "idle";
 
+  const selectedCompareFrames = compareFrameIds
+    .map((id) => frames.find((frame) => frame.id === id) ?? null)
+    .filter((frame): frame is ExplorerFrame => frame !== null);
+
+  const activeSubtraction =
+    restas.find((resta) => resta.id === activeSubtractionId) ?? null;
+  const isComparing = restas.some((resta) => resta.status === "loading");
+
+  const handleToggleCompareFrame = (frameId: string) => {
+    setCompareFrameIds((prev) => {
+      if (prev.includes(frameId)) {
+        return prev.filter((id) => id !== frameId);
+      }
+      if (prev.length < EXPLORER_CONFIG.compareMaxFrames) {
+        return [...prev, frameId];
+      }
+      return [prev[EXPLORER_CONFIG.firstIndex], frameId];
+    });
+  };
+
+  const handleSwapCompareFrames = () => {
+    setCompareFrameIds((prev) =>
+      prev.length === EXPLORER_CONFIG.compareMaxFrames
+        ? [prev[EXPLORER_CONFIG.indexStep], prev[EXPLORER_CONFIG.firstIndex]]
+        : prev
+    );
+  };
+
+  const handleCompareFrames = async () => {
+    const frameA = selectedCompareFrames[EXPLORER_CONFIG.firstIndex];
+    const frameB = selectedCompareFrames[EXPLORER_CONFIG.indexStep];
+    if (!frameA || !frameB || isComparing) {
+      return;
+    }
+
+    const restaId = `resta-${Date.now()}-${frameA.id}-${frameB.id}`;
+    const pendingResta: SubtractionResult = {
+      id: restaId,
+      frameA,
+      frameB,
+      createdAt: new Date().toISOString(),
+      status: "loading",
+    };
+
+    setRestas((prev) => [pendingResta, ...prev]);
+    setActiveSubtractionId(restaId);
+    setIsCompareSelecting(false);
+    setCompareFrameIds([]);
+
+    const result = await requestFrameComparison(query, frameA, frameB);
+    setRestas((prev) =>
+      prev.map((item) =>
+        item.id === restaId
+          ? result.ok
+            ? {
+                ...item,
+                status: "ready",
+                imageUrl: result.imageUrl,
+                summary: result.summary,
+              }
+            : {
+                ...item,
+                status: "error",
+                errorMessage: result.errorMessage,
+              }
+          : item
+      )
+    );
+  };
+
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-[var(--ae-bg-canvas)] text-[var(--ae-text-primary)]">
       <ExplorerTopBar
@@ -402,9 +552,13 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
           query={query}
           layers={layers}
           activeFrame={activeFrame}
+          activeSubtraction={activeSubtraction}
           activeTool={activeTool}
           zoomLevel={zoomLevel}
+          panOffset={panOffset}
           locale={locale}
+          onPanChange={setPanOffset}
+          onZoomChange={setZoomLevel}
           onCanvasClick={handleCanvasClick}
           spectrumGrid={spectrumGrid}
           selectedChunk={
@@ -424,33 +578,58 @@ export function ExplorerView({ query, onBackToPortal }: ExplorerViewProps) {
           />
         )}
 
-        {/* Temporarily hidden from layout: Layers & Blend Mode
         <aside
-          aria-label="Layers inspector"
-          className="hidden w-80 shrink-0 border-l border-[var(--ae-border-subtle)] md:block"
+          aria-label="Compare inspector"
+          className="hidden w-80 shrink-0 overflow-y-auto border-l border-[var(--ae-border-subtle)] bg-[var(--ae-bg-base)] md:flex md:flex-col"
         >
           <LayersInspector
             layers={layers}
+            availableChannels={availableChannels}
             activeLayerId={activeLayerId}
             locale={locale}
-            onSelectLayer={setActiveLayerId}
-            onToggleLayerVisibility={handleToggleLayerVisibility}
-            onAddLayer={handleAddLayer}
             onUpdateLayer={handleUpdateLayer}
-            onMergeVisible={handleMergeVisible}
+          />
+          <CompareInspector
+            isCompareSelecting={isCompareSelecting}
+            selectedFrames={selectedCompareFrames}
+            restas={restas}
+            activeSubtractionId={activeSubtractionId}
+            isComparing={isComparing}
+            locale={locale}
+            onStartCompareSelection={() => {
+              setIsCompareSelecting(true);
+              setCompareFrameIds([]);
+            }}
+            onCancelCompareSelection={() => {
+              setIsCompareSelecting(false);
+              setCompareFrameIds([]);
+            }}
+            onRemoveSelectedFrame={(frameId) =>
+              setCompareFrameIds((prev) => prev.filter((id) => id !== frameId))
+            }
+            onSwapFrames={handleSwapCompareFrames}
+            onCompare={handleCompareFrames}
+            onSelectResta={(restaId) => setActiveSubtractionId(restaId)}
+            onExitRestaView={() => setActiveSubtractionId(null)}
           />
         </aside>
-        */}
       </div>
 
       <ExplorerTimeline
         frames={frames}
+        availableChannels={availableChannels}
         activeFrameId={activeFrameId}
         timelineTab={timelineTab}
         bandFilter={bandFilter}
         isPlaying={isPlaying}
+        isCompareSelecting={isCompareSelecting}
+        compareFrameIds={compareFrameIds}
         locale={locale}
-        onSelectFrame={setActiveFrameId}
+        onSelectFrame={(frameId) => {
+          setActiveSubtractionId(null);
+          setActiveFrameId(frameId);
+        }}
+        onToggleCompareFrame={handleToggleCompareFrame}
         onChangeTab={setTimelineTab}
         onChangeBandFilter={setBandFilter}
         onTogglePlay={() => setIsPlaying((prev) => !prev)}

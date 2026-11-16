@@ -2,7 +2,7 @@ import { SiGithub } from "@icons-pack/react-simple-icons";
 import {
   ArrowLeft,
   BookOpen,
-  GitMerge,
+  // GitMerge,
   Menu,
   Redo2,
   Telescope,
@@ -21,7 +21,7 @@ interface ExplorerTopBarProps {
   onBackToPortal: () => void;
   onUndo: () => void;
   onRedo: () => void;
-  onMergeExport: () => void;
+  onMergeExport?: () => void;
   onOpenDocs: () => void;
   onToggleLocale: () => void;
 }
@@ -43,7 +43,6 @@ export function ExplorerTopBar({
   onBackToPortal,
   onUndo,
   onRedo,
-  onMergeExport,
   onOpenDocs,
   onToggleLocale,
 }: ExplorerTopBarProps) {
@@ -111,6 +110,7 @@ export function ExplorerTopBar({
 
         <div className="mx-1 h-4 w-px bg-[var(--ae-border-subtle)]" />
 
+        {/* Temporarily hidden from layout: Merge / Export
         <button
           type="button"
           onClick={onMergeExport}
@@ -119,6 +119,7 @@ export function ExplorerTopBar({
           <GitMerge size={EXPLORER_CONFIG.iconSizeSm} aria-hidden="true" />
           <span>{copy.mergeExport}</span>
         </button>
+        */}
 
         <button
           type="button"
@@ -182,6 +183,7 @@ export function ExplorerTopBar({
             tabIndex={EXPLORER_CONFIG.firstIndex}
             className="menu dropdown-content z-30 mt-2 w-48 rounded-lg border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-elevated)] p-1.5 shadow-xl"
           >
+            {/* Temporarily hidden from layout: Merge / Export
             <li>
               <button type="button" onClick={onMergeExport}>
                 <GitMerge
@@ -191,6 +193,7 @@ export function ExplorerTopBar({
                 {copy.mergeExport}
               </button>
             </li>
+            */}
             <li>
               <button type="button" onClick={onUndo} disabled={!canUndo}>
                 <Undo2 size={EXPLORER_CONFIG.iconSizeSm} aria-hidden="true" />

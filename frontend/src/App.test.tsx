@@ -127,10 +127,8 @@ describe("Astro Sentinella Portal", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Explore" }));
 
-    // Temporarily hidden from layout: Layers inspector
-    // expect(screen.getByRole("heading", { name: "Layers" })).toBeInTheDocument();
     expect(
-      screen.getByRole("region", { name: "Timeline" })
+      screen.getByRole("heading", { name: "Compare" })
     ).toBeInTheDocument();
   });
 
@@ -181,10 +179,8 @@ describe("Astro Sentinella Portal", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Explore" }));
 
-    // Temporarily hidden from layout: Layers inspector
-    // expect(screen.getByRole("heading", { name: "Layers" })).toBeInTheDocument();
     expect(
-      screen.getByRole("region", { name: "Timeline" })
+      screen.getByRole("heading", { name: "Compare" })
     ).toBeInTheDocument();
     expect(
       screen.getByText(

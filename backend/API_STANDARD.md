@@ -5,9 +5,22 @@ This document defines conventions for implementing the Flask API consumed by the
 ## Current Frontend Contracts
 
 - `GET /api/metadata?ra={ra}&dec={dec}` returns coordinate metadata used to populate available observation dates.
+- `GET /api/metadata/detectors?ra={ra}&dec={dec}&observationDate={date}` returns the
+  detector files available for one date, including their wavelength ranges. This
+  endpoint only queries SIA2 metadata; it does not download FITS data.
 - `GET /api/frames?ra={ra}&dec={dec}&fieldSizeDeg={degrees}&observationDate={date}` returns the frames for an explorer query.
+- `GET /api/frames/image?...&detector={1-6}` renders one detector on demand.
+  `detectors=1,2,...` renders a comparison. The first available detector is used
+  when no detector is specified. The legacy single-value `bands=2` parameter
+  is ignored for initial loading and also uses the first available detector;
+  explicit `detector` requests remain strict.
 - `GET /api/frames/spectrum?ra={ra}&dec={dec}&fieldSizeDeg={degrees}&observationDate={date}&x={0..1}&y={0..1}` returns the quick-look spectrum (flux vs wavelength, 102 SPHEREx channels) of the chunk under a click on the rendered frame image.
 - `GET /api/spectrum/observations?ra={ra}&dec={dec}[&aperturePx=1|3|5][&detectors=1,2,...]` returns the per-exposure spectrum at a sky position, assembled from one pixel of every Level-2 exposure covering it. Slow (seconds); meant as an opt-in detail view, not for the click path.
+
+Detector ranges are fixed by the SPHEREx instrument: D1 `0.75–1.11 µm`, D2
+`1.11–1.66 µm`, D3 `1.64–2.42 µm`, D4 `2.42–3.18 µm`, D5 `3.18–4.41 µm`,
+and D6 `4.41–5.00 µm`. FITS data is cached per detector URL after its first
+render, so selecting a date does not download all six files.
 
 ### Chunk spectrum
 

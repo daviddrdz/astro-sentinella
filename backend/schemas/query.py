@@ -28,6 +28,7 @@ class SkyImageQuery:
     field_size_deg: float = 0.05
     color: str = "magma"
     bands: tuple[int, ...] = ()
+    detectors: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -134,7 +135,16 @@ def parse_sky_image_query(args: Mapping[str, str]) -> SkyImageQuery:
             f"'color' must be one of: {', '.join(VALID_RENDER_COLORS)}."
         )
 
-    bands = _parse_id_list(args, "bands", VALID_RENDER_BANDS)
+    # `detectors` (or singular `detector`) wins over the legacy `bands` parameter.
+    detector_param = next(
+        (name for name in ("detectors", "detector") if (args.get(name) or "").strip()), None
+    )
+    if detector_param:
+        detectors = _parse_id_list(args, detector_param, VALID_RENDER_BANDS)
+        bands = detectors
+    else:
+        detectors = ()
+        bands = _parse_id_list(args, "bands", VALID_RENDER_BANDS)
 
     return SkyImageQuery(
         coords.ra_deg,
@@ -143,4 +153,5 @@ def parse_sky_image_query(args: Mapping[str, str]) -> SkyImageQuery:
         field_size_deg,
         color,
         bands,
+        detectors,
     )

@@ -37,6 +37,9 @@ export interface ExplorerFrame {
   filtered: boolean;
   visible: boolean;
   imageUrl?: string;
+  detector?: BandChannelId;
+  wavelengthMinUm?: number;
+  wavelengthMaxUm?: number;
 }
 
 export interface ExplorerSnapshot {
@@ -81,3 +84,13 @@ export type SpectrumState =
   | { status: "loading"; pending: { x: number; y: number } }
   | { status: "loaded"; data: ChunkSpectrum }
   | { status: "error"; message: string };
+export interface SubtractionResult {
+  id: string;
+  frameA: ExplorerFrame;
+  frameB: ExplorerFrame;
+  createdAt: string;
+  status: "loading" | "ready" | "error";
+  imageUrl?: string;
+  summary?: string;
+  errorMessage?: string;
+}

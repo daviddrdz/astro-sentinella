@@ -12,6 +12,9 @@ import type {
 export const EXPLORER_CONFIG = {
   framesEndpoint: "/api/frames",
   spectrumEndpoint: "/api/frames/spectrum",
+  compareEndpoint: "/api/frames/compare",
+  compareMaxFrames: 2,
+  detectorRangeDecimals: 2,
   defaultArcminPerDeg: 60,
   defaultScaleArcmin: 5,
   playbackIntervalMs: 1200,
@@ -23,6 +26,8 @@ export const EXPLORER_CONFIG = {
   zoomMax: 4,
   zoomStep: 0.25,
   zoomDefault: 1,
+  dragThresholdPx: 4,
+  wheelZoomSensitivity: 0.0015,
   indexStep: 1,
   firstIndex: 0,
   maxUndoHistory: 30,
@@ -78,12 +83,12 @@ export interface BandChannelOption {
 }
 
 export const BAND_CHANNELS: readonly BandChannelOption[] = [
-  { id: 1, label: "Band 1 (0.75 – 1.10 µm) — Optical / Near-IR" },
-  { id: 2, label: "Band 2 (1.10 – 1.58 µm) — Near-Infrared" },
-  { id: 3, label: "Band 3 (1.58 – 2.14 µm) — Near-Infrared" },
-  { id: 4, label: "Band 4 (2.14 – 2.82 µm) — Mid-Near Infrared" },
-  { id: 5, label: "Band 5 (2.82 – 3.80 µm) — Infrared" },
-  { id: 6, label: "Band 6 (3.80 – 5.00 µm) — Deep Infrared" },
+  { id: 1, label: "Detector 1 (0.75 – 1.11 µm)" },
+  { id: 2, label: "Detector 2 (1.11 – 1.66 µm)" },
+  { id: 3, label: "Detector 3 (1.64 – 2.42 µm)" },
+  { id: 4, label: "Detector 4 (2.42 – 3.18 µm)" },
+  { id: 5, label: "Detector 5 (3.18 – 4.41 µm)" },
+  { id: 6, label: "Detector 6 (4.41 – 5.00 µm)" },
 ];
 
 export interface ChannelTintOption {
@@ -152,6 +157,26 @@ export const EXPLORER_COPY: Record<
     spectrumChunk: string;
     spectrumShowTable: string;
     spectrumClose: string;
+    compareTitle: string;
+    compareHint: string;
+    frameALabel: string;
+    frameBLabel: string;
+    selectFromTimeline: string;
+    compareAction: string;
+    comparing: string;
+    clearSelection: string;
+    swapFrames: string;
+    restasTitle: string;
+    noRestas: string;
+    viewResult: string;
+    viewingResult: string;
+    backToFrames: string;
+    compareFailed: string;
+    pickForCompare: string;
+    comparingSkeleton: string;
+    startCompare: string;
+    cancelCompare: string;
+    compareSelectingHint: string;
   }
 > = {
   en: {
@@ -196,6 +221,26 @@ export const EXPLORER_COPY: Record<
     spectrumChunk: "Chunk",
     spectrumShowTable: "Show data table",
     spectrumClose: "Close spectrum",
+    compareTitle: "Compare",
+    compareHint: "Select 2 frames from the timeline to subtract.",
+    frameALabel: "Frame A",
+    frameBLabel: "Frame B",
+    selectFromTimeline: "Select from timeline",
+    compareAction: "Compare",
+    comparing: "Comparing...",
+    clearSelection: "Clear",
+    swapFrames: "Swap",
+    restasTitle: "Restas",
+    noRestas: "No subtractions yet.",
+    viewResult: "View",
+    viewingResult: "Viewing",
+    backToFrames: "Back to frame",
+    compareFailed: "Compare endpoint is not available yet.",
+    pickForCompare: "Select for compare",
+    comparingSkeleton: "Computing sector subtraction...",
+    startCompare: "Compare 2 frames",
+    cancelCompare: "Cancel",
+    compareSelectingHint: "Click 2 frames in the timeline to select them.",
   },
   es: {
     backToPortal: "Volver al Portal",
@@ -238,6 +283,27 @@ export const EXPLORER_COPY: Record<
     spectrumChunk: "Chunk",
     spectrumShowTable: "Ver tabla de datos",
     spectrumClose: "Cerrar espectro",
+    compareTitle: "Comparar",
+    compareHint: "Selecciona 2 fotogramas en la línea de tiempo para restar.",
+    frameALabel: "Fotograma A",
+    frameBLabel: "Fotograma B",
+    selectFromTimeline: "Selecciona en la línea de tiempo",
+    compareAction: "Comparar",
+    comparing: "Comparando...",
+    clearSelection: "Limpiar",
+    swapFrames: "Intercambiar",
+    restasTitle: "Restas",
+    noRestas: "Aún no hay restas.",
+    viewResult: "Ver",
+    viewingResult: "Viendo",
+    backToFrames: "Volver al fotograma",
+    compareFailed: "El endpoint de comparación aún no está disponible.",
+    pickForCompare: "Seleccionar para comparar",
+    comparingSkeleton: "Calculando resta entre sectores...",
+    startCompare: "Comparar 2 fotogramas",
+    cancelCompare: "Cancelar",
+    compareSelectingHint:
+      "Haz clic en 2 fotogramas de la línea de tiempo para seleccionarlos.",
   },
 };
 
