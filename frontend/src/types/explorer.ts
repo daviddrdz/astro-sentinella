@@ -3,15 +3,7 @@ import type { FrameComparisonMetrics } from "../utils/frameMetrics";
 export type ExplorerLocale = "en" | "es";
 export type ExplorerViewMode = "2d" | "3d";
 
-export type ExplorerToolId =
-  | "hand"
-  | "zoom"
-  | "split"
-  | "subtract"
-  | "region"
-  | "ruler"
-  | "spectrum"
-  | "reset";
+export type ExplorerToolId = "hand" | "subtract" | "spectrum" | "reset";
 
 export type BlendMode = "Normal" | "Subtract" | "Screen" | "Add";
 

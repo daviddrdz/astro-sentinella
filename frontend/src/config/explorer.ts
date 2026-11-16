@@ -12,8 +12,10 @@ import type {
 export const EXPLORER_CONFIG = {
   framesEndpoint: "/api/frames",
   spectrumEndpoint: "/api/frames/spectrum",
-  compareEndpoint: "/api/frames/compare",
+  compareEndpoint: "/api/subtract",
   compareMaxFrames: 2,
+  compareImageSizePx: 512,
+  compareScaleDecimals: 3,
   detectorRangeDecimals: 2,
   defaultArcminPerDeg: 60,
   defaultScaleArcmin: 5,
@@ -24,7 +26,6 @@ export const EXPLORER_CONFIG = {
   defaultNewLayerOpacity: 80,
   zoomMin: 0.35,
   zoomMax: 4,
-  zoomStep: 0.25,
   zoomDefault: 1,
   dragThresholdPx: 4,
   wheelZoomSensitivity: 0.0015,
@@ -49,15 +50,11 @@ export interface ToolOption {
 
 export const EXPLORER_TOOLS: readonly ToolOption[] = [
   { id: "hand", mobileVisible: true, label: { en: "Pan", es: "Mover" } },
-  { id: "zoom", mobileVisible: true, label: { en: "Zoom", es: "Zoom" } },
-  { id: "split", mobileVisible: true, label: { en: "Split", es: "Dividir" } },
   {
     id: "subtract",
     mobileVisible: true,
     label: { en: "Subtract", es: "Restar" },
   },
-  { id: "region", mobileVisible: false, label: { en: "Region", es: "Región" } },
-  { id: "ruler", mobileVisible: false, label: { en: "Ruler", es: "Regla" } },
   {
     id: "spectrum",
     mobileVisible: true,
@@ -250,7 +247,7 @@ export const EXPLORER_COPY: Record<
     viewResult: "View",
     viewingResult: "Viewing",
     backToFrames: "Back to frame",
-    compareFailed: "Compare endpoint is not available yet.",
+    compareFailed: "The subtraction could not be computed.",
     pickForCompare: "Select for compare",
     comparingSkeleton: "Computing sector subtraction...",
     startCompare: "Compare 2 frames",
@@ -327,7 +324,7 @@ export const EXPLORER_COPY: Record<
     viewResult: "Ver",
     viewingResult: "Viendo",
     backToFrames: "Volver al fotograma",
-    compareFailed: "El endpoint de comparación aún no está disponible.",
+    compareFailed: "No se pudo calcular la resta.",
     pickForCompare: "Seleccionar para comparar",
     comparingSkeleton: "Calculando resta entre sectores...",
     startCompare: "Comparar 2 fotogramas",

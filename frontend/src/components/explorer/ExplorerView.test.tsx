@@ -46,11 +46,17 @@ describe("ExplorerView", () => {
       .spyOn(globalThis, "fetch")
       .mockImplementation((input) => {
         const url = typeof input === "string" ? input : input.toString();
-        if (url.includes("/api/frames/compare")) {
+        if (url.includes("/api/subtract")) {
           return Promise.resolve(
             new Response(
               JSON.stringify({
-                summary: "Sector diff computed",
+                imageDataUrl: "data:image/png;base64,AAAA",
+                summary: {
+                  meta: { days_between: 12.5 },
+                  difference_image: { flux_scale_k: 1.0234 },
+                  change_detection: { candidates_total: 3 },
+                  candidates: [],
+                },
               }),
               {
                 status: 200,
@@ -105,19 +111,34 @@ describe("ExplorerView", () => {
       await within(comparePanel).findByText("18:40Z - 18:50Z")
     ).toBeInTheDocument();
     expect(
-      within(comparePanel).getByText("Sector diff computed")
+      within(comparePanel).getByText("D2 · Δt 12.5 d · k=1.023 · 3 candidates")
     ).toBeInTheDocument();
     expect(
-      fetchSpy.mock.calls.some(([url]) =>
-        String(url).includes("/api/frames/compare")
-      )
-    ).toBe(true);
+      screen.getByRole("img", { name: "18:40Z minus 18:50Z" })
+    ).toHaveAttribute("src", "data:image/png;base64,AAAA");
+
+    const subtractCall = fetchSpy.mock.calls.find(([url]) =>
+      String(url).includes("/api/subtract")
+    );
+    expect(subtractCall).toBeDefined();
+    const [, init] = subtractCall!;
+    expect(init?.method).toBe("POST");
+    expect(JSON.parse(String(init?.body))).toEqual({
+      ra: SAMPLE_QUERY.ra,
+      dec: SAMPLE_QUERY.dec,
+      observationDateA: "18:40Z",
+      observationDateB: "18:50Z",
+      detector: 2,
+      size: 512,
+    });
 
     // Exit subtraction view and re-visualize from Restas
     fireEvent.click(
       within(comparePanel).getByRole("button", { name: "Back to frame" })
     );
-    expect(screen.queryByText("Sector diff computed")).toBeInTheDocument();
+    expect(
+      screen.queryByText("D2 · Δt 12.5 d · k=1.023 · 3 candidates")
+    ).toBeInTheDocument();
 
     fireEvent.click(
       within(comparePanel).getByRole("button", {
@@ -154,32 +175,6 @@ describe("ExplorerView", () => {
       within(timeline).getByRole("button", { name: "Next frame" })
     );
     expect(within(timeline).getByText("5 / 8")).toBeInTheDocument();
-  });
-
-  it("toggles between 2D and 3D views and toggles 3D sky overlays", () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(null, { status: 404 })
-    );
-
-    render(<ExplorerView query={SAMPLE_QUERY} onBackToPortal={vi.fn()} />);
-
-    const btn3D = screen.getByRole("button", { name: "3D" });
-    fireEvent.click(btn3D);
-
-    expect(screen.getByTestId("explorer-3d-canvas")).toBeInTheDocument();
-    const deepSkyBtn = screen.getByRole("button", { name: "Deep Sky" });
-    expect(deepSkyBtn).toHaveAttribute("aria-pressed", "true");
-
-    fireEvent.click(deepSkyBtn);
-    expect(deepSkyBtn).toHaveAttribute("aria-pressed", "false");
-
-    const planetsBtn = screen.getByRole("button", { name: "Planets" });
-    expect(planetsBtn).toHaveAttribute("aria-pressed", "true");
-    fireEvent.click(planetsBtn);
-    expect(planetsBtn).toHaveAttribute("aria-pressed", "false");
-
-    fireEvent.click(screen.getByRole("button", { name: "2D" }));
-    expect(screen.queryByTestId("explorer-3d-canvas")).not.toBeInTheDocument();
   });
 
   it("toggles between 2D and 3D views and toggles 3D sky overlays", () => {

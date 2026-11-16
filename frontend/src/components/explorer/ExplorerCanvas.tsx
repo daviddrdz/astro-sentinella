@@ -15,7 +15,6 @@ import type {
 } from "../../types/explorer";
 import type { QueryParams } from "../../types/portal";
 import { clamp01, containedBox, type Size } from "../../utils/spectrum";
-import { formatAngularSeparation } from "../../utils/frameMetrics";
 import {
   formatDecSexagesimal,
   formatRaSexagesimal,
@@ -25,8 +24,6 @@ import {
 } from "../../config/sky3dCatalog";
 
 const DEFAULT_FIELD_SIZE_DEG = 0.5;
-const RULER_MAX_POINTS = 2;
-const RULER_HALF = 0.5;
 const RULER_PCT = 100;
 const ZOOM_OUT_OUTER_RING_THRESHOLD = 0.92;
 const TILE_OUTER_RADIUS = 2;
@@ -47,7 +44,6 @@ interface ExplorerCanvasProps {
   locale: ExplorerLocale;
   onPanChange: (next: { x: number; y: number }) => void;
   onZoomChange: (nextZoom: number) => void;
-  onCanvasClick: () => void;
   /** Chunk grid learned from the last spectrum response (cells are invisible). */
   spectrumGrid?: { rows: number; cols: number } | null;
   selectedChunk?: ChunkBounds | null;
@@ -114,7 +110,6 @@ export function ExplorerCanvas({
   locale,
   onPanChange,
   onZoomChange,
-  onCanvasClick,
   spectrumGrid = null,
   selectedChunk = null,
   pendingChunkClick = null,
@@ -157,9 +152,6 @@ export function ExplorerCanvas({
     row: number;
     col: number;
   } | null>(null);
-  const [rulerPoints, setRulerPoints] = useState<
-    Array<{ x: number; y: number }>
-  >([]);
   const [tileStatus, setTileStatus] = useState<
     Record<string, "loading" | "loaded" | "error">
   >({});
@@ -346,12 +338,8 @@ export function ExplorerCanvas({
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
-    const wasMoved = drag.moved;
     dragStateRef.current = null;
     setIsDragging(false);
-    if (!wasMoved) {
-      onCanvasClick();
-    }
   };
 
   const handleWheel = (event: React.WheelEvent<HTMLElement>) => {
@@ -371,9 +359,7 @@ export function ExplorerCanvas({
       ? isDragging
         ? "cursor-grabbing"
         : "cursor-grab"
-      : activeTool === "zoom"
-        ? "cursor-zoom-in"
-        : "cursor-crosshair";
+      : "cursor-crosshair";
 
   return (
     <section
@@ -383,11 +369,6 @@ export function ExplorerCanvas({
       onPointerUp={finishDrag}
       onPointerCancel={finishDrag}
       onWheel={handleWheel}
-      onClick={() => {
-        if (activeTool !== "hand") {
-          onCanvasClick();
-        }
-      }}
       className={`relative flex flex-1 items-center justify-center overflow-hidden bg-[var(--ae-bg-canvas)] select-none touch-none ${cursorClass}`}
     >
       {/* Subtle astrometric grid */}
@@ -680,18 +661,6 @@ export function ExplorerCanvas({
         {/* Central reticle temporarily removed */}
 
         {/* Active tool overlays */}
-        {activeTool === "split" && (
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-y-0 left-1/2 w-0.5 bg-[var(--ae-accent)]/80"
-          />
-        )}
-        {activeTool === "region" && (
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute top-1/4 left-1/4 h-1/2 w-1/2 border border-dashed border-[var(--ae-warning)]/80"
-          />
-        )}
         {activeTool === "spectrum" &&
           onChunkSelect &&
           primaryUrl &&
@@ -773,74 +742,6 @@ export function ExplorerCanvas({
               )}
             </div>
           )}
-        {activeTool === "ruler" && (
-          <div
-            data-testid="ruler-overlay"
-            className="absolute inset-0 z-10 cursor-crosshair"
-            onClick={(event) => {
-              event.stopPropagation();
-              const rect = event.currentTarget.getBoundingClientRect();
-              if (rect.width <= 0 || rect.height <= 0) return;
-              const pt = {
-                x: clamp01((event.clientX - rect.left) / rect.width),
-                y: clamp01((event.clientY - rect.top) / rect.height),
-              };
-              setRulerPoints((prev) =>
-                prev.length >= RULER_MAX_POINTS ? [pt] : [...prev, pt]
-              );
-            }}
-          >
-            {rulerPoints.length === RULER_MAX_POINTS && (
-              <svg
-                aria-hidden="true"
-                className="pointer-events-none h-full w-full"
-                viewBox={`0 0 ${RULER_PCT} ${RULER_PCT}`}
-                preserveAspectRatio="none"
-              >
-                <line
-                  x1={rulerPoints[0].x * RULER_PCT}
-                  y1={rulerPoints[0].y * RULER_PCT}
-                  x2={rulerPoints[1].x * RULER_PCT}
-                  y2={rulerPoints[1].y * RULER_PCT}
-                  stroke="var(--ae-accent-primary)"
-                  strokeWidth="0.4"
-                  strokeDasharray="1.5 1"
-                />
-              </svg>
-            )}
-            {rulerPoints.map((pt, idx) => (
-              <div
-                key={`${idx}-${pt.x}-${pt.y}`}
-                className="pointer-events-none absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-[var(--ae-accent-primary-content)] bg-[var(--ae-accent-primary)]"
-                style={{
-                  left: `${pt.x * RULER_PCT}%`,
-                  top: `${pt.y * RULER_PCT}%`,
-                }}
-              />
-            ))}
-            {rulerPoints.length === RULER_MAX_POINTS ? (
-              <div
-                data-testid="ruler-readout"
-                className="pointer-events-none absolute -translate-x-1/2 -translate-y-full rounded-[var(--ae-radius-sm)] border border-[var(--ae-border-strong)] bg-[var(--ae-bg-surface)]/95 px-2.5 py-1 font-mono text-xs font-medium text-[var(--ae-text-primary)] shadow"
-                style={{
-                  left: `${(rulerPoints[0].x + rulerPoints[1].x) * RULER_HALF * RULER_PCT}%`,
-                  top: `${(rulerPoints[0].y + rulerPoints[1].y) * RULER_HALF * RULER_PCT}%`,
-                }}
-              >
-                {`${copy.rulerSeparation}: ${formatAngularSeparation(
-                  Math.hypot(
-                    rulerPoints[1].x - rulerPoints[0].x,
-                    rulerPoints[1].y - rulerPoints[0].y
-                  ) * (Number(query.fieldSizeDeg) || DEFAULT_FIELD_SIZE_DEG)
-                )}`}
-              </div>
-            ) : (
-              <div className="pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 rounded-[var(--ae-radius-sm)] border border-[var(--ae-border-subtle)] bg-[var(--ae-bg-surface)]/90 px-3 py-1 text-xs text-[var(--ae-text-secondary)]">
-                {copy.rulerHint}
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Bottom-left scale HUD */}
